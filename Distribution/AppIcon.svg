@@ -1,0 +1,93 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="lapis" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#203b67"/>
+      <stop offset="0.46" stop-color="#0e213f"/>
+      <stop offset="1" stop-color="#07111f"/>
+    </linearGradient>
+    <linearGradient id="rim" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f0e6d1" stop-opacity="0.82"/>
+      <stop offset="0.3" stop-color="#7793ba" stop-opacity="0.2"/>
+      <stop offset="1" stop-color="#d1b46f" stop-opacity="0.58"/>
+    </linearGradient>
+    <linearGradient id="leftStone" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#b9c4d2"/>
+      <stop offset="0.48" stop-color="#7f8b9b"/>
+      <stop offset="1" stop-color="#46515f"/>
+    </linearGradient>
+    <linearGradient id="rightStone" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#d4d9dd"/>
+      <stop offset="0.5" stop-color="#929aa3"/>
+      <stop offset="1" stop-color="#4c555f"/>
+    </linearGradient>
+    <linearGradient id="centerStone" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f2eee6"/>
+      <stop offset="0.5" stop-color="#c8c2b8"/>
+      <stop offset="1" stop-color="#706d6c"/>
+    </linearGradient>
+    <linearGradient id="secret" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f8db84" stop-opacity="0.95"/>
+      <stop offset="0.55" stop-color="#c28d35" stop-opacity="0.78"/>
+      <stop offset="1" stop-color="#5b3812" stop-opacity="0.12"/>
+    </linearGradient>
+    <filter id="stoneNoise" x="-10%" y="-10%" width="120%" height="120%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.018" numOctaves="4" seed="24" result="noise"/>
+      <feColorMatrix in="noise" type="saturate" values="0" result="mono"/>
+      <feBlend in="SourceGraphic" in2="mono" mode="soft-light"/>
+    </filter>
+    <filter id="rearShadow" x="-40%" y="-30%" width="180%" height="180%">
+      <feDropShadow dx="0" dy="25" stdDeviation="24" flood-color="#020713" flood-opacity="0.88"/>
+    </filter>
+    <filter id="glow" x="-250%" y="-30%" width="600%" height="160%">
+      <feGaussianBlur stdDeviation="18"/>
+    </filter>
+    <clipPath id="tileClip">
+      <rect x="48" y="48" width="928" height="928" rx="218"/>
+    </clipPath>
+  </defs>
+
+  <g clip-path="url(#tileClip)">
+    <rect x="48" y="48" width="928" height="928" rx="218" fill="url(#lapis)"/>
+    <g filter="url(#stoneNoise)" opacity="0.55">
+      <rect x="48" y="48" width="928" height="928" rx="218" fill="#173054"/>
+    </g>
+    <g fill="none" stroke-linecap="round">
+      <path d="M72 726C244 635 323 799 502 678S779 526 956 583" stroke="#87a6cf" stroke-width="14" opacity="0.14"/>
+      <path d="M113 261C269 353 341 225 484 293S739 383 914 245" stroke="#d6bc77" stroke-width="9" opacity="0.18"/>
+      <path d="M137 867C287 756 389 912 552 803S794 703 933 763" stroke="#f2e5c4" stroke-width="5" opacity="0.1"/>
+    </g>
+
+    <ellipse cx="512" cy="835" rx="354" ry="82" fill="#020713" opacity="0.58"/>
+
+    <g filter="url(#rearShadow)">
+      <path d="M161 829L218 446L320 318L391 829Z" fill="url(#leftStone)"/>
+      <path d="M218 446L320 318L298 829L161 829Z" fill="#9aa5b3" opacity="0.67"/>
+      <path d="M320 318L391 829L298 829Z" fill="#3e4a59" opacity="0.82"/>
+      <path d="M188 689L283 480L255 770" fill="none" stroke="#d8dee4" stroke-width="12" opacity="0.28"/>
+
+      <path d="M637 829L705 442L807 309L871 829Z" fill="url(#rightStone)"/>
+      <path d="M705 442L807 309L776 829L637 829Z" fill="#bac2c8" opacity="0.7"/>
+      <path d="M807 309L871 829L776 829Z" fill="#424c56" opacity="0.86"/>
+      <path d="M704 706L773 481L757 749" fill="none" stroke="#edf0ed" stroke-width="11" opacity="0.25"/>
+    </g>
+
+    <g filter="url(#rearShadow)">
+      <path d="M327 829L399 269L512 111L631 269L697 829Z" fill="url(#centerStone)"/>
+      <path d="M399 269L512 111L486 829L327 829Z" fill="#dedbd4" opacity="0.75"/>
+      <path d="M512 111L631 269L697 829L540 829Z" fill="#85817f" opacity="0.82"/>
+      <path d="M399 269L512 111L540 829L486 829Z" fill="#b8b2aa" opacity="0.62"/>
+      <path d="M431 691L471 311L451 718M587 316L625 692" fill="none" stroke="#66686d" stroke-width="13" opacity="0.34"/>
+      <path d="M414 409L457 291M570 242L616 431" fill="none" stroke="#ffffff" stroke-width="8" opacity="0.25"/>
+    </g>
+
+    <path d="M510 207L540 267L535 740L493 740L497 272Z" fill="#090d14" opacity="0.9"/>
+    <path d="M512 218L529 270L524 723L504 723L507 274Z" fill="url(#secret)" filter="url(#glow)" opacity="0.72"/>
+    <path d="M512 218L529 270L524 723L504 723L507 274Z" fill="url(#secret)"/>
+    <circle cx="514" cy="742" r="17" fill="#d2a449" opacity="0.88"/>
+
+    <path d="M126 829H899" stroke="#f1e3c1" stroke-width="7" opacity="0.26"/>
+  </g>
+
+  <rect x="48" y="48" width="928" height="928" rx="218" fill="none" stroke="url(#rim)" stroke-width="18"/>
+  <rect x="65" y="65" width="894" height="894" rx="202" fill="none" stroke="#ffffff" stroke-width="3" opacity="0.18"/>
+</svg>

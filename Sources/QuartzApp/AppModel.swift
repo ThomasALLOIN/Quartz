@@ -34,6 +34,7 @@ final class AppModel: ObservableObject {
         static let llmEnabled = "llmEnabled"
         static let postItMode = "postItMode"
         static let postItModeSelection = "postItModeSelection"
+        static let previewMigrationCompleted = "previewPreferencesMigratedToApp"
     }
 
     private let calendar = Calendar.french
@@ -80,6 +81,8 @@ final class AppModel: ObservableObject {
     private var llmRequestTask: Task<Void, Never>?
 
     init() {
+        Self.migratePreviewPreferences(in: UserDefaults.standard)
+
         let initialCalendar = Calendar.french
         let initialDate = initialCalendar.startOfDay(for: Date())
         selectedDate = initialDate
@@ -182,6 +185,21 @@ final class AppModel: ObservableObject {
             )
             applyNotificationReport(report)
         }
+    }
+
+    private static func migratePreviewPreferences(in defaults: UserDefaults) {
+        guard
+            Bundle.main.bundleURL.pathExtension.lowercased() == "app",
+            defaults.object(forKey: PreferenceKey.previewMigrationCompleted) == nil
+        else { return }
+
+        if let previewPreferences = defaults.persistentDomain(forName: "QuartzPreview") {
+            for (key, value) in previewPreferences where defaults.object(forKey: key) == nil {
+                defaults.set(value, forKey: key)
+            }
+        }
+
+        defaults.set(true, forKey: PreferenceKey.previewMigrationCompleted)
     }
 
     var visibleTasks: [TodoTask] {

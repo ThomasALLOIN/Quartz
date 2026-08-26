@@ -171,3 +171,23 @@ if ! contains_text 'HStack(spacing: 8)' "$WEEK_STRIP" \
   exit 1
 fi
 print "✓ Les sept jours conservent une présentation aérée"
+
+PACKAGER="$PROJECT_DIR/Packager.command"
+BUNDLE_INFO="$PROJECT_DIR/Distribution/Info.plist"
+APP_ICON="$PROJECT_DIR/Distribution/Quartz.icns"
+RESOURCE_RESOLVER="$PROJECT_DIR/Sources/QuartzApp/Services/QuartzResources.swift"
+if [[ ! -x "$PACKAGER" ]] \
+  || [[ ! -s "$BUNDLE_INFO" ]] \
+  || [[ ! -s "$APP_ICON" ]] \
+  || [[ ! -s "$RESOURCE_RESOLVER" ]]; then
+  print -u2 "✗ Les éléments nécessaires à Quartz.app sont incomplets"
+  exit 1
+fi
+if ! plutil -lint "$BUNDLE_INFO" >/dev/null \
+  || ! contains_text '<string>com.thomasalloin.Quartz</string>' "$BUNDLE_INFO" \
+  || ! contains_text 'Quartz_QuartzApp.bundle' "$RESOURCE_RESOLVER" \
+  || ! contains_text 'persistentDomain(forName: "QuartzPreview")' "$APP_MODEL"; then
+  print -u2 "✗ Le bundle doit conserver son identité, ses ressources et les préférences de l’aperçu"
+  exit 1
+fi
+print "✓ Quartz.app dispose de son identité, de son icône et de ses ressources"

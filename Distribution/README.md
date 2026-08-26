@@ -1,36 +1,59 @@
-# Préparation de la distribution macOS
+# Distribution macOS de Quartz
 
-Quartz reste volontairement un aperçu SwiftPM jusqu’à la validation explicite de son design et de ses fonctions. Ce dossier décrit le passage au `.app` sans déclencher cette étape prématurément.
+Le design et le parcours fonctionnel de Quartz ont été validés par l’utilisateur le 26 août 2026. La génération du `.app` est donc autorisée.
 
-## État préparatoire
+## Première livraison locale
 
-- cible actuelle : macOS 14 minimum ;
-- cœur de l’application : SwiftUI + AppKit, sans service distant ;
-- IA : modèle français embarqué, exécution limitée aux Mac Apple Silicon et dépendance temporaire à `mlx_lm.server` installé sur le Mac ;
-- données : `~/Library/Application Support/Quartz`, avec sauvegarde précédente et quarantaine `Recovery` ;
-- modèle de 136 Mo : suivi par Git LFS ;
-- notifications : code prêt, mais livraison réelle à valider dans un bundle signé ;
-- synchronisation cloud et publication App Store : hors périmètre tant qu’elles ne sont pas demandées.
+- version : `1.0.0` (`CFBundleVersion` 1) ;
+- identifiant : `com.thomasalloin.Quartz` ;
+- cible : macOS 14 ou ultérieur, Apple Silicon ;
+- application : `dist/Quartz.app` ;
+- archive : `dist/Quartz-1.0.0-macOS-Apple-Silicon.zip` ;
+- signature actuelle : ad hoc locale, vérifiée avec `codesign` ;
+- icône : galet de lapis texturé avec les trois obélisques et la faille centrale ;
+- ressources incluses : textures, relief du widget et modèle français MLX de 136 Mo ;
+- intégration externe : binaire `quartz` inclus dans `Contents/Helpers`.
 
-## Décisions requises avant de générer le `.app`
+Cette version est destinée au Mac de développement et à la validation locale. Elle n’est pas encore notarisée pour une diffusion publique.
 
-1. Valider le design et le parcours fonctionnel dans les tailles 400 × 400 et 600 × 600, ainsi que le widget 74 × 42.
-2. Confirmer macOS 14 et Apple Silicon comme première cible de diffusion.
-3. Choisir si le moteur MLX doit être embarqué, remplacé par une intégration Swift native ou installé au premier lancement.
-4. Confirmer l’identifiant de bundle proposé : `com.thomasalloin.Quartz`.
-5. Choisir une diffusion directe signée/notarisée ou une future publication App Store.
+## Construire l’application
 
-## Étapes du jalon `.app`
+Le modèle étant suivi par Git LFS, vérifier d’abord qu’il est présent, puis lancer :
 
-1. Installer ou mettre à jour Xcode complet et sélectionner son outil développeur.
-2. Créer la cible macOS `Quartz` à partir du package existant sans dupliquer le moteur `QuartzKit`.
-3. Ajouter l’AppIcon final, l’identifiant de bundle, les numéros de version et les réglages de signature.
-4. Embarquer les textures et le modèle LFS dans les ressources de la cible.
-5. Choisir puis intégrer le moteur MLX autonome.
-6. Tester l’autorisation, la planification et la livraison des notifications.
-7. Vérifier migration, sauvegarde, mode hors ligne et fermeture de MLX sur un Mac propre.
-8. Archiver, signer, notariser puis seulement produire l’exécutable validé.
+```bash
+git lfs pull
+./Packager.command
+```
 
-## Contrôle avant diffusion
+`Packager.command` exécute par défaut `Verifier.command`, compile les deux exécutables en mode release, assemble le bundle et ses ressources, applique la signature, vérifie l’architecture et crée le ZIP.
 
-Exécuter `./Verifier.command`, puis faire un essai manuel complet sans données de développement. Une version ne doit pas être diffusée si une récupération de données, une notification ou le démarrage/arrêt de l’IA n’a pas été vérifié dans le bundle final.
+Les valeurs peuvent être adaptées sans modifier le script :
+
+```bash
+QUARTZ_VERSION=1.0.1 \
+QUARTZ_BUILD_NUMBER=2 \
+QUARTZ_BUNDLE_ID=com.thomasalloin.Quartz \
+./Packager.command
+```
+
+Une identité Apple peut être fournie plus tard avec `QUARTZ_SIGN_IDENTITY`. Sans cette variable, le script utilise volontairement la signature ad hoc `-`.
+
+## Fonctionnement du bundle
+
+Les données restent dans `~/Library/Application Support/Quartz`. Au premier lancement du `.app`, Quartz importe les préférences du précédent exécutable `QuartzPreview` lorsque la nouvelle application n’a pas déjà une valeur équivalente.
+
+Les notifications locales sont disponibles parce que l’application possède désormais un bundle macOS et un identifiant stable. L’autorisation est demandée uniquement lorsque l’utilisateur active **Notifications** dans les réglages.
+
+Le modèle spécialisé est embarqué. Le moteur exécutable `mlx_lm.server` reste temporairement une dépendance installée sur le Mac ; Quartz le détecte, le lance sur `127.0.0.1`, refuse un serveur incompatible et arrête uniquement le processus qu’il a créé.
+
+## Avant une diffusion à d’autres utilisateurs
+
+Il reste à :
+
+1. intégrer MLX nativement en Swift ou embarquer proprement son environnement d’exécution ;
+2. signer avec un certificat Apple Developer ID et activer le hardened runtime ;
+3. notariser le ZIP auprès d’Apple puis agrafer le ticket au bundle ;
+4. tester installation, notifications, migration, IA et fermeture du moteur sur un Mac Apple Silicon propre ;
+5. décider si une version Intel ou universelle est réellement nécessaire.
+
+Une publication App Store, iCloud et Calendrier Apple reste hors du périmètre actuel.

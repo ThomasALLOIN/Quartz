@@ -12,3 +12,4 @@ captures/
 MLX/Adapters/
 MLX/Base/
 MLX/Fused/
+dist/

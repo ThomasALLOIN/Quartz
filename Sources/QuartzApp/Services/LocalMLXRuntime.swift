@@ -223,7 +223,7 @@ final class LocalMLXRuntime {
         if let override = ProcessInfo.processInfo.environment["QUARTZ_MLX_MODEL"] {
             candidates.append(URL(fileURLWithPath: override))
         }
-        if let resources = Bundle.module.resourceURL {
+        if let resources = QuartzResources.resourceURL {
             // SwiftPM aplatit les ressources traitées à la racine du bundle.
             candidates.append(resources)
             candidates.append(resources.appendingPathComponent("MLX/quartz-fr"))

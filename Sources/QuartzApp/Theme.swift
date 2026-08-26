@@ -12,7 +12,7 @@ private final class StoneTextureStore: @unchecked Sendable {
             return cached
         }
         guard
-            let url = Bundle.module.url(forResource: name, withExtension: fileExtension),
+            let url = QuartzResources.url(forResource: name, withExtension: fileExtension),
             let image = NSImage(contentsOf: url)
         else { return nil }
         cache.setObject(image, forKey: key)
