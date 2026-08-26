@@ -14,6 +14,24 @@ export SWIFTPM_MODULECACHE_OVERRIDE="${TMPDIR:-/private/tmp}/quartz-swiftpm-cach
 swift build
 swift run QuartzChecks
 
+DEVELOPER_DIR="$(xcode-select -p)"
+TESTING_FRAMEWORKS="$DEVELOPER_DIR/Library/Developer/Frameworks"
+TESTING_INTEROP="$DEVELOPER_DIR/Library/Developer/usr/lib"
+(
+  # Le SDK 15.4 contourne l’incompatibilité de l’aperçu, tandis que Swift
+  # Testing doit utiliser le SDK courant livré avec le compilateur.
+  unset SDKROOT
+  if [[ -d "$TESTING_FRAMEWORKS/Testing.framework" && -f "$TESTING_INTEROP/lib_TestingInterop.dylib" ]]; then
+    swift test --enable-swift-testing --disable-xctest \
+      -Xswiftc -F -Xswiftc "$TESTING_FRAMEWORKS" \
+      -Xlinker "-F$TESTING_FRAMEWORKS" \
+      -Xlinker -rpath -Xlinker "$TESTING_FRAMEWORKS" \
+      -Xlinker -rpath -Xlinker "$TESTING_INTEROP"
+  else
+    swift test --enable-swift-testing --disable-xctest
+  fi
+)
+
 for required_path in \
   Sources/QuartzKit \
   Sources/QuartzApp \
@@ -84,7 +102,13 @@ if [[ ! -s "$LOCAL_MODEL" ]] \
   print -u2 "✗ Le modèle MLX doit être une ressource gérée automatiquement par Quartz"
   exit 1
 fi
-print "✓ Le modèle MLX est intégré et son cycle de vie est géré par Quartz"
+if ! rg -q -F 'case unexpectedServer' "$LOCAL_RUNTIME" \
+  || ! rg -q -F 'modelList.data.count == 1' "$LOCAL_RUNTIME" \
+  || ! rg -q -F 'truncate(atOffset: 0)' "$LOCAL_RUNTIME"; then
+  print -u2 "✗ Quartz doit refuser un serveur MLX incompatible et borner son journal"
+  exit 1
+fi
+print "✓ Le modèle MLX est intégré, identifié et son cycle de vie est géré par Quartz"
 
 APP_MODEL="$PROJECT_DIR/Sources/QuartzApp/AppModel.swift"
 LLM_COMPOSER="$PROJECT_DIR/Sources/QuartzApp/Views/LLMComposerView.swift"
@@ -99,6 +123,39 @@ if ! rg -q -F 'static let llmEnabled = "llmEnabled"' "$APP_MODEL" \
   exit 1
 fi
 print "✓ L’IA locale peut être activée ou coupée depuis Quartz"
+
+
+RECOVERABLE_STORE="$PROJECT_DIR/Sources/QuartzKit/RecoverableJSONStore.swift"
+PERSISTENCE_TESTS="$PROJECT_DIR/Tests/QuartzKitTests/RecoverableJSONStoreTests.swift"
+if ! rg -q -F 'quarantinePrimaryFile()' "$RECOVERABLE_STORE" \
+  || ! rg -q -F 'backupURL' "$RECOVERABLE_STORE" \
+  || ! rg -q -F 'case failed(JSONFileStoreFailure)' "$RECOVERABLE_STORE" \
+  || [[ ! -s "$PERSISTENCE_TESTS" ]] \
+  || ! rg -q -F 'storageNotice' "$APP_MODEL"; then
+  print -u2 "✗ La sauvegarde, la quarantaine et la récupération des données doivent rester actives"
+  exit 1
+fi
+print "✓ Les données disposent d’une sauvegarde automatique et d’une récupération testée"
+
+NOTIFICATION_SCHEDULER="$PROJECT_DIR/Sources/QuartzApp/Services/NotificationScheduler.swift"
+if ! rg -q -F 'planningHorizonDays = 365' "$NOTIFICATION_SCHEDULER" \
+  || ! rg -q -F 'failedCount' "$NOTIFICATION_SCHEDULER" \
+  || ! rg -q -F 'content.userInfo' "$NOTIFICATION_SCHEDULER" \
+  || ! rg -q -F 'applyNotificationReport' "$APP_MODEL"; then
+  print -u2 "✗ Les notifications doivent conserver leur horizon et signaler les échecs"
+  exit 1
+fi
+print "✓ Les notifications planifient jusqu’à un an et exposent leurs échecs"
+
+TASK_LIST="$PROJECT_DIR/Sources/QuartzApp/Views/TaskListView.swift"
+POST_IT_BOARD="$PROJECT_DIR/Sources/QuartzApp/Views/PostItBoardView.swift"
+if ! rg -q -F '.accessibilityActions {' "$TASK_LIST" \
+  || ! rg -q -F 'pendingSave: Task<Void, Never>?' "$POST_IT_BOARD" \
+  || ! rg -q -F '.accessibilityActions {' "$POST_IT_BOARD"; then
+  print -u2 "✗ Les actions essentielles doivent rester disponibles sans survol et les post-it temporisés"
+  exit 1
+fi
+print "✓ Les actions critiques sont accessibles et les post-it évitent les écritures à chaque frappe"
 
 WEEK_STRIP="$PROJECT_DIR/Sources/QuartzApp/Views/RootView.swift"
 if ! rg -q -F 'HStack(spacing: 8)' "$WEEK_STRIP" \

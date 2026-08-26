@@ -30,6 +30,10 @@ let package = Package(
         .executableTarget(
             name: "QuartzCLI",
             dependencies: ["QuartzKit"]
+        ),
+        .testTarget(
+            name: "QuartzKitTests",
+            dependencies: ["QuartzKit"]
         )
     ]
 )

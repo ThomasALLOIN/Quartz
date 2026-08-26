@@ -79,15 +79,36 @@ struct SettingsView: View {
                         SettingToggleRow(
                             icon: "cpu.fill",
                             title: "IA locale",
-                            detail: model.llmEnabled
-                                ? "Disponible à la demande, sans envoyer vos données sur Internet."
-                                : "Le modèle ne peut pas démarrer ni analyser de demande.",
+                            detail: model.llmRuntimeStatusLabel,
                             isOn: Binding(
                                 get: { model.llmEnabled },
                                 set: { model.setLLMEnabled($0) }
                             ),
                             palette: palette
                         )
+                    }
+
+                    SettingsSection(title: "Données", palette: palette) {
+                        HStack(alignment: .top, spacing: 11) {
+                            Image(systemName: "externaldrive.fill")
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundStyle(palette.accent)
+                                .frame(width: 23, height: 23)
+                                .background(Circle().fill(palette.accent.opacity(0.1)))
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Sauvegarde locale")
+                                    .font(.system(size: 13.5, weight: .medium))
+                                    .foregroundStyle(palette.text)
+                                Text("Quartz conserve automatiquement la dernière version valide et isole tout fichier illisible.")
+                                    .font(.system(size: 10.8))
+                                    .foregroundStyle(palette.secondary)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                            Spacer(minLength: 8)
+                            Button("Afficher") { model.revealDataFolder() }
+                                .buttonStyle(.bordered)
+                                .controlSize(.small)
+                        }
                     }
 
                     SettingsSection(title: "Style de pierre", palette: palette) {

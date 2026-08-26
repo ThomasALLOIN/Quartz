@@ -67,6 +67,16 @@ struct RootView: View {
                 .environmentObject(model)
                 .environment(\.colorScheme, model.theme.usesDarkAppearance ? .dark : .light)
         }
+        .alert(item: $model.storageNotice) { notice in
+            Alert(
+                title: Text(notice.title),
+                message: Text(notice.message),
+                primaryButton: .default(Text("Afficher les données")) {
+                    model.revealDataFolder()
+                },
+                secondaryButton: .cancel(Text("Fermer"))
+            )
+        }
     }
 }
 

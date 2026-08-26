@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://local.quartz/task-request.schema.json",
-  "title": "Demande de création de tâche Écrin",
+  "title": "Demande de création de tâche Quartz",
   "type": "object",
   "additionalProperties": false,
   "required": ["title"],

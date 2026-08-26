@@ -5,6 +5,7 @@ enum LocalMLXRuntimeError: LocalizedError {
     case executableMissing
     case modelMissing
     case invalidEndpoint
+    case unexpectedServer
     case launchFailed
     case startupTimedOut
 
@@ -18,6 +19,8 @@ enum LocalMLXRuntimeError: LocalizedError {
             "Le petit modèle français de Quartz est introuvable."
         case .invalidEndpoint:
             "L’adresse locale de MLX est invalide."
+        case .unexpectedServer:
+            "Le port local de Quartz est déjà utilisé par un autre serveur de modèles."
         case .launchFailed:
             "Quartz n’a pas réussi à démarrer son moteur local."
         case .startupTimedOut:
@@ -36,19 +39,43 @@ final class LocalMLXRuntime {
 
     private init() {}
 
+    var isRuntimeInstalled: Bool {
+#if arch(arm64)
+        mlxExecutableURL() != nil && fusedModelURL() != nil
+#else
+        false
+#endif
+    }
+
     func ensureRunning(configuration: LLMConnectionConfiguration) async throws {
-        if await serverIsReady(endpoint: configuration.endpoint) { return }
+        switch await serverState(endpoint: configuration.endpoint) {
+        case .compatible:
+            return
+        case .incompatible:
+            throw LocalMLXRuntimeError.unexpectedServer
+        case .unreachable:
+            break
+        }
 
         if process?.isRunning != true {
             try start(configuration: configuration)
         }
 
         for _ in 0..<120 {
-            if await serverIsReady(endpoint: configuration.endpoint) { return }
+            switch await serverState(endpoint: configuration.endpoint) {
+            case .compatible:
+                return
+            case .incompatible:
+                stop()
+                throw LocalMLXRuntimeError.unexpectedServer
+            case .unreachable:
+                break
+            }
             if process?.isRunning == false { throw LocalMLXRuntimeError.launchFailed }
             try await Task.sleep(for: .milliseconds(250))
         }
 
+        stop()
         throw LocalMLXRuntimeError.startupTimedOut
     }
 
@@ -85,7 +112,7 @@ final class LocalMLXRuntime {
         let logURL = applicationSupportURL().appendingPathComponent("mlx.log")
         FileManager.default.createFile(atPath: logURL.path, contents: nil)
         let handle = try? FileHandle(forWritingTo: logURL)
-        handle?.seekToEndOfFile()
+        try? handle?.truncate(atOffset: 0)
         process.standardOutput = handle ?? FileHandle.nullDevice
         process.standardError = handle ?? FileHandle.nullDevice
 
@@ -103,17 +130,42 @@ final class LocalMLXRuntime {
 #endif
     }
 
-    private func serverIsReady(endpoint: String) async -> Bool {
-        guard let url = modelsEndpoint(from: endpoint) else { return false }
+    private enum ServerState {
+        case unreachable
+        case compatible
+        case incompatible
+    }
+
+    private struct ModelList: Decodable {
+        struct Model: Decodable {
+            let id: String
+        }
+
+        let data: [Model]
+    }
+
+    private func serverState(endpoint: String) async -> ServerState {
+        guard let url = modelsEndpoint(from: endpoint) else { return .unreachable }
         var request = URLRequest(url: url)
         request.timeoutInterval = 1
         request.cachePolicy = .reloadIgnoringLocalAndRemoteCacheData
 
         guard
-            let (_, response) = try? await URLSession.shared.data(for: request),
-            let httpResponse = response as? HTTPURLResponse
-        else { return false }
-        return (200..<300).contains(httpResponse.statusCode)
+            let (data, response) = try? await URLSession.shared.data(for: request),
+            let httpResponse = response as? HTTPURLResponse,
+            (200..<300).contains(httpResponse.statusCode)
+        else { return .unreachable }
+
+        guard
+            let modelList = try? JSONDecoder().decode(ModelList.self, from: data),
+            modelList.data.count == 1,
+            let identifier = modelList.data.first?.id.lowercased()
+        else { return .incompatible }
+
+        let recognized = identifier == "default_model"
+            || identifier.contains("quartz-fr")
+            || identifier.contains("smollm2-135m")
+        return recognized ? .compatible : .incompatible
     }
 
     private func modelsEndpoint(from endpoint: String) -> URL? {

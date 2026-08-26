@@ -159,6 +159,7 @@ private struct PostItCard: View {
     let palette: StonePalette
     @State private var text: String
     @State private var hoveringDelete = false
+    @State private var pendingSave: Task<Void, Never>?
 
     init(note: PostItNote, palette: StonePalette) {
         self.note = note
@@ -196,7 +197,12 @@ private struct PostItCard: View {
                 .background(Color.clear)
                 .frame(minHeight: 112, maxHeight: 112)
                 .onChange(of: text) { _, value in
-                    model.updatePostIt(id: note.id, text: value)
+                    pendingSave?.cancel()
+                    pendingSave = Task {
+                        try? await Task.sleep(for: .milliseconds(350))
+                        guard !Task.isCancelled else { return }
+                        model.updatePostIt(id: note.id, text: value)
+                    }
                 }
         }
         .padding(11)
@@ -222,6 +228,13 @@ private struct PostItCard: View {
         .shadow(color: Color.black.opacity(0.16), radius: 7, y: 4)
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Post-it modifiable")
+        .accessibilityActions {
+            Button("Supprimer ce post-it") { model.deletePostIt(id: note.id) }
+        }
+        .onDisappear {
+            pendingSave?.cancel()
+            model.updatePostIt(id: note.id, text: text)
+        }
     }
 
     private var ink: Color { note.tone.inkColor }

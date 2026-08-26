@@ -16,7 +16,7 @@ Cette étape livre un **aperçu natif**, pas un fichier `.app` :
 - mode post-it séparé avec deux types : les jaunes restent visibles tous les jours ; les verts « daily » sont liés à une seule date ; les saisies manuelles, MLX ou déposées par un agent suivent le type actif et ne touchent ni au calendrier ni à sa progression ;
 - récurrences quotidienne, jours ouvrés, hebdomadaire et mensuelle ;
 - planification des rappels locaux via le système de notifications Apple dans le futur bundle validé ;
-- stockage local sur le Mac ;
+- stockage local sur le Mac, avec conservation automatique de la dernière version valide et copie de tout fichier illisible dans `Recovery` ;
 - deux textures minérales réelles mises en cache pour une transition fluide : **Lapis nuit** bleu et **Marbre noir** veiné gris perle ;
 - réduction/dépliage rapides, avec retour automatique à la dernière position de la pierre compacte ;
 - toujours visible, sons et menu de barre macOS avec l’option « Afficher le widget ».
@@ -24,7 +24,18 @@ Cette étape livre un **aperçu natif**, pas un fichier `.app` :
 - composeur relié à un unique petit modèle local MLX spécialisé en français, inclus dans les ressources de Quartz et démarré automatiquement en arrière-plan au premier envoi, sans Terminal ni fournisseur distant ; chaque proposition ouvre l’éditeur pour confirmation avant création.
 - interrupteur « IA locale » mémorisé dans le composeur et les réglages : le couper annule l’analyse en cours, empêche tout nouvel envoi et arrête le moteur démarré par Quartz.
 
-Le `.app`, l’icône finale, la signature et la distribution sont volontairement reportés jusqu’à validation fonctionnelle et visuelle.
+Le `.app`, l’icône finale, la signature et la distribution sont volontairement reportés jusqu’à validation fonctionnelle et visuelle. Le passage au bundle est préparé dans [Distribution/README.md](Distribution/README.md).
+
+## Récupérer le projet
+
+Le modèle de 136 Mo est suivi avec Git LFS :
+
+```bash
+git clone https://github.com/ThomasALLOIN/Quartz.git
+cd Quartz
+git lfs install --local
+git lfs pull
+```
 
 ## Ouvrir l’aperçu
 
@@ -44,7 +55,7 @@ Pour créer une tâche avec le modèle local :
 4. cliquer sur la flèche : Quartz démarre MLX silencieusement lors du premier envoi ;
 5. vérifier la fiche préremplie, puis choisir **Enregistrer**.
 
-`MLX.command` reste disponible uniquement comme outil de diagnostic pour le développement ; il n’est plus nécessaire dans l’utilisation normale.
+`MLX.command` reste disponible uniquement comme outil de diagnostic pour le développement ; il n’est plus nécessaire dans l’utilisation normale. Le modèle français est inclus, mais le prototype dépend encore de l’exécutable `mlx_lm.server` installé sur le Mac. Les réglages indiquent clairement si ce moteur est prêt ; le futur `.app` devra l’embarquer ou le remplacer.
 
 Le modèle ne crée jamais une tâche de calendrier directement : l’écran de vérification reste obligatoire. Les formulations françaises explicites de date, d’heure, de récurrence et de rappel sont relues par le moteur de Quartz ; « demain, chaque jours à 19h, rappel 15 minutes avant » conserve donc ces quatre informations même si le petit modèle les oublie. Une demande contenant manifestement plusieurs tâches est refusée avec une invitation à les envoyer une par une. La destination tâche, post-it jaune ou post-it vert est figée au moment où la flèche est pressée.
 
@@ -62,12 +73,19 @@ Pour déplacer la pierre réduite, saisissez-la n’importe où et faites-la gli
 ./Verifier.command
 ```
 
+Cette commande compile Quartz, exécute les 89 contrôles du moteur, les tests Swift de sauvegarde/récupération et les gardes statiques de l’interface. La même vérification s’exécute automatiquement sur GitHub à chaque envoi.
+
 Les données de l’aperçu sont conservées dans :
 
 ```text
 ~/Library/Application Support/Quartz/tasks.json
 ~/Library/Application Support/Quartz/post-its.json
+~/Library/Application Support/Quartz/tasks.backup.json
+~/Library/Application Support/Quartz/post-its.backup.json
+~/Library/Application Support/Quartz/Recovery/
 ```
+
+Le bouton **Afficher** de la section **Données** ouvre directement ce dossier. Une erreur de lecture ou d’écriture est affichée dans Quartz au lieu d’être ignorée.
 
 ## Ajouter une tâche depuis un agent ou le Terminal
 
@@ -89,4 +107,6 @@ Quartz importe la demande lorsqu’il est ouvert ou au prochain lancement. Les o
 
 - une modification de récurrence agit sur toute la série ; les exceptions par occurrence viendront après validation du besoin ;
 - la synchronisation iCloud ou Calendrier Apple n’est pas incluse ;
-- l’aperçu `swift run` n’est pas un bundle reconnu par macOS : son interrupteur de notifications est donc désactivé proprement ; l’autorisation et la livraison seront validées dans le `.app` signé avant diffusion.
+- l’aperçu `swift run` n’est pas un bundle reconnu par macOS : son interrupteur de notifications est donc désactivé proprement ; l’autorisation et la livraison seront validées dans le `.app` signé avant diffusion ;
+- Quartz planifie jusqu’à un an d’occurrences, dans une file limitée aux 56 prochains rappels et renouvelée à chaque ouverture ou modification ;
+- le moteur MLX exécutable n’est pas encore autonome dans le bundle, même si le modèle français est déjà inclus.

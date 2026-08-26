@@ -15,6 +15,12 @@ struct EditorRequest: Identifiable {
     }
 }
 
+struct StorageNotice: Identifiable {
+    let id = UUID()
+    let title: String
+    let message: String
+}
+
 @MainActor
 final class AppModel: ObservableObject {
     private enum PreferenceKey {
@@ -39,7 +45,7 @@ final class AppModel: ObservableObject {
 
     @Published private(set) var tasks: [TodoTask] {
         didSet {
-            persistence.save(tasks)
+            reportStorageFailure(persistence.save(tasks), collection: "tâches")
             rescheduleNotifications()
         }
     }
@@ -51,10 +57,13 @@ final class AppModel: ObservableObject {
     @Published private(set) var soundsEnabled: Bool
     @Published private(set) var theme: StoneTheme
     @Published private(set) var notificationStatus: UNAuthorizationStatus = .notDetermined
+    @Published private(set) var notificationIssue: String?
     @Published private(set) var llmConfiguration: LLMConnectionConfiguration
     @Published private(set) var llmEnabled: Bool
     @Published private(set) var postIts: [PostItNote] {
-        didSet { postItPersistence.save(postIts) }
+        didSet {
+            reportStorageFailure(postItPersistence.save(postIts), collection: "post-it")
+        }
     }
     @Published private(set) var postItMode: PostItMode
     @Published private(set) var postItShelfVisible = false
@@ -64,6 +73,7 @@ final class AppModel: ObservableObject {
     @Published var llmConnectionPresented = false
     @Published var editorRequest: EditorRequest?
     @Published var settingsPresented = false
+    @Published var storageNotice: StorageNotice?
 
     private var postItHoverGeneration = 0
     private var postItShelfPinned = false
@@ -96,7 +106,24 @@ final class AppModel: ObservableObject {
         llmEnabled = defaults.object(forKey: PreferenceKey.llmEnabled) == nil
             ? true
             : defaults.bool(forKey: PreferenceKey.llmEnabled)
-        postIts = postItPersistence.load()
+        var initialStorageMessages: [String] = []
+        switch postItPersistence.load() {
+        case .missing:
+            postIts = []
+        case let .loaded(notes):
+            postIts = notes
+        case let .recovered(notes, quarantinedFileURL):
+            postIts = notes
+            initialStorageMessages.append(
+                Self.recoveryMessage(
+                    collection: "post-it",
+                    quarantinedFileURL: quarantinedFileURL
+                )
+            )
+        case let .failed(error):
+            postIts = []
+            initialStorageMessages.append(Self.failureMessage(collection: "post-it", error: error))
+        }
         if
             let rawMode = defaults.string(forKey: PreferenceKey.postItModeSelection),
             let storedMode = PostItMode(rawValue: rawMode)
@@ -106,15 +133,36 @@ final class AppModel: ObservableObject {
             postItMode = defaults.bool(forKey: PreferenceKey.postItMode) ? .persistent : .off
         }
 
-        if let storedTasks = persistence.load() {
-            tasks = storedTasks
-        } else {
+        switch persistence.load() {
+        case .missing:
             tasks = Self.demoTasks(for: initialDate, calendar: initialCalendar)
-            persistence.save(tasks)
+            if let error = persistence.save(tasks) {
+                initialStorageMessages.append(Self.failureMessage(collection: "tâches", error: error))
+            }
+        case let .loaded(storedTasks):
+            tasks = storedTasks
+        case let .recovered(storedTasks, quarantinedFileURL):
+            tasks = storedTasks
+            initialStorageMessages.append(
+                Self.recoveryMessage(
+                    collection: "tâches",
+                    quarantinedFileURL: quarantinedFileURL
+                )
+            )
+        case let .failed(error):
+            tasks = []
+            initialStorageMessages.append(Self.failureMessage(collection: "tâches", error: error))
         }
 
         if defaults.string(forKey: PreferenceKey.theme) != theme.rawValue {
             defaults.set(theme.rawValue, forKey: PreferenceKey.theme)
+        }
+
+        if !initialStorageMessages.isEmpty {
+            storageNotice = StorageNotice(
+                title: "Quartz a protégé vos données",
+                message: initialStorageMessages.joined(separator: "\n\n")
+            )
         }
 
         WindowCoordinator.shared.onVisibilityChange = { [weak self] visible in
@@ -127,11 +175,12 @@ final class AppModel: ObservableObject {
 
         Task {
             await refreshNotificationStatus()
-            await notificationScheduler.reschedule(
+            let report = await notificationScheduler.reschedule(
                 tasks: tasks,
                 enabled: notificationsEnabled,
                 soundsEnabled: soundsEnabled
             )
+            applyNotificationReport(report)
         }
     }
 
@@ -232,6 +281,7 @@ final class AppModel: ObservableObject {
         guard notificationsAvailable else {
             return "Disponible dans le .app après validation"
         }
+        if let notificationIssue { return notificationIssue }
         return switch notificationStatus {
         case .authorized, .provisional, .ephemeral: "Autorisées par macOS"
         case .denied: "Refusées dans Réglages Système"
@@ -256,6 +306,16 @@ final class AppModel: ObservableObject {
         case .sending: "analyse en cours…"
         case .error: "à reformuler"
         }
+    }
+
+    var llmRuntimeStatusLabel: String {
+        guard llmEnabled else {
+            return "Le modèle ne peut pas démarrer ni analyser de demande."
+        }
+        if LocalMLXRuntime.shared.isRuntimeInstalled {
+            return "Modèle français intégré et moteur MLX prêt sur ce Mac."
+        }
+        return "Modèle français intégré ; le moteur MLX-LM doit encore être installé sur ce Mac."
     }
 
     var isLLMSending: Bool {
@@ -653,6 +713,7 @@ final class AppModel: ObservableObject {
     func setNotificationsEnabled(_ enabled: Bool) {
         if !enabled {
             notificationsEnabled = false
+            notificationIssue = nil
             defaults.set(false, forKey: PreferenceKey.notifications)
             notificationScheduler.clear()
             return
@@ -669,11 +730,12 @@ final class AppModel: ObservableObject {
             notificationsEnabled = granted
             defaults.set(granted, forKey: PreferenceKey.notifications)
             await refreshNotificationStatus()
-            await notificationScheduler.reschedule(
+            let report = await notificationScheduler.reschedule(
                 tasks: tasks,
                 enabled: granted,
                 soundsEnabled: soundsEnabled
             )
+            applyNotificationReport(report)
         }
     }
 
@@ -681,13 +743,70 @@ final class AppModel: ObservableObject {
         notificationStatus = await notificationScheduler.authorizationStatus()
     }
 
+    func revealDataFolder() {
+        let directory = persistence.dataDirectoryURL
+        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        NSWorkspace.shared.open(directory)
+    }
+
+    private func reportStorageFailure(
+        _ error: JSONFileStoreFailure?,
+        collection: String
+    ) {
+        guard let error else { return }
+        let message = Self.failureMessage(collection: collection, error: error)
+        if let current = storageNotice {
+            guard !current.message.contains(message) else { return }
+            storageNotice = StorageNotice(
+                title: "Quartz n’a pas pu tout enregistrer",
+                message: current.message + "\n\n" + message
+            )
+        } else {
+            storageNotice = StorageNotice(
+                title: "Quartz n’a pas pu enregistrer",
+                message: message
+            )
+        }
+    }
+
+    private static func recoveryMessage(
+        collection: String,
+        quarantinedFileURL: URL?
+    ) -> String {
+        let preserved = quarantinedFileURL == nil
+            ? "La sauvegarde précédente a été restaurée."
+            : "Le fichier illisible a été conservé dans Recovery et la sauvegarde précédente a été restaurée."
+        return "Quartz a récupéré les \(collection). \(preserved)"
+    }
+
+    private static func failureMessage(
+        collection: String,
+        error: JSONFileStoreFailure
+    ) -> String {
+        let preserved = error.recoveryFileURL == nil
+            ? "Le fichier existant n’a pas été supprimé."
+            : "Une copie du fichier illisible a été conservée dans Recovery."
+        return "Quartz n’a pas pu charger ou enregistrer les \(collection). \(preserved)"
+    }
+
     private func rescheduleNotifications() {
         Task {
-            await notificationScheduler.reschedule(
+            let report = await notificationScheduler.reschedule(
                 tasks: tasks,
                 enabled: notificationsEnabled,
                 soundsEnabled: soundsEnabled
             )
+            applyNotificationReport(report)
+        }
+    }
+
+    private func applyNotificationReport(_ report: NotificationSchedulingReport) {
+        if report.failedCount > 0 {
+            notificationIssue = "\(report.failedCount) rappel\(report.failedCount > 1 ? "s" : "") non planifié\(report.failedCount > 1 ? "s" : "")."
+        } else if report.pendingLimitReached {
+            notificationIssue = "\(report.scheduledCount) prochains rappels planifiés ; la file se renouvelle à chaque ouverture ou modification."
+        } else {
+            notificationIssue = nil
         }
     }
 

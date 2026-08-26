@@ -136,6 +136,14 @@ private struct PersistentPostItCard: View {
         }
         .onHover { isHovering = $0 }
         .animation(.easeOut(duration: 0.12), value: isHovering)
+        .accessibilityActions {
+            Button("Afficher et modifier ce post-it") {
+                model.openPostItBoard(showing: note.scope)
+            }
+            Button("Supprimer ce post-it") {
+                model.deletePostIt(id: note.id)
+            }
+        }
     }
 }
 
@@ -348,12 +356,29 @@ struct TaskRowView: View {
                 Button(isExpanded ? "Masquer les sous-tâches" : "Afficher les sous-tâches") {
                     onToggleExpansion()
                 }
+                Button("Terminer toutes les sous-tâches") {
+                    model.completeAllSubtasks(task)
+                }
+                .disabled(allSubtasksCompleted)
             }
             Divider()
             Button("Supprimer", role: .destructive) { model.delete(task) }
         }
         .accessibilityElement(children: .contain)
         .accessibilityLabel(accessibilityLabel)
+        .accessibilityActions {
+            Button("Modifier la tâche") { model.openEditor(for: task) }
+            if !task.subtasks.isEmpty {
+                Button(isExpanded ? "Masquer les sous-tâches" : "Afficher les sous-tâches") {
+                    onToggleExpansion()
+                }
+                Button("Terminer toutes les sous-tâches") {
+                    model.completeAllSubtasks(task)
+                }
+                .disabled(allSubtasksCompleted)
+            }
+            Button("Supprimer la tâche") { model.delete(task) }
+        }
     }
 
     private var accessibilityLabel: String {
