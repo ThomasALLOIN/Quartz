@@ -1,0 +1,14 @@
+.DS_Store
+*.swp
+*.swo
+.env
+.env.*
+.build/
+.swiftpm/
+DerivedData/
+*.xcodeproj/xcuserdata/
+*.xcworkspace/xcuserdata/
+captures/
+MLX/Adapters/
+MLX/Base/
+MLX/Fused/
