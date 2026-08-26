@@ -11,6 +11,12 @@ fi
 export CLANG_MODULE_CACHE_PATH="${TMPDIR:-/private/tmp}/quartz-clang-cache"
 export SWIFTPM_MODULECACHE_OVERRIDE="${TMPDIR:-/private/tmp}/quartz-swiftpm-cache"
 
+if command -v rg >/dev/null 2>&1; then
+  contains_text() { rg -q -F -- "$1" "$2" }
+else
+  contains_text() { grep -q -F -- "$1" "$2" }
+fi
+
 swift build
 swift run QuartzChecks
 
@@ -46,13 +52,11 @@ for required_path in \
 done
 
 OLD_NAME_PATTERN='[Ee][Cc][Rr][Ii][Nn]'
-if rg -n "$OLD_NAME_PATTERN" "$PROJECT_DIR" \
-  -g '!.build/**' \
-  -g '!.git/**' \
-  -g '!Sources/QuartzKit/ExternalIntegration.swift' \
-  -g '!Sources/QuartzApp/Services/WindowCoordinator.swift' \
-  -g '!Sources/QuartzChecks/main.swift' \
-  -g '!Verifier.command'; then
+if git grep -n -I -E "$OLD_NAME_PATTERN" -- . \
+  ':(exclude)Sources/QuartzKit/ExternalIntegration.swift' \
+  ':(exclude)Sources/QuartzApp/Services/WindowCoordinator.swift' \
+  ':(exclude)Sources/QuartzChecks/main.swift' \
+  ':(exclude)Verifier.command'; then
   print -u2 "✗ Une référence à l’ancien nom subsiste hors du code de migration"
   exit 1
 fi
@@ -60,20 +64,20 @@ print "✓ Le projet, ses modules et ses commandes portent le nom Quartz"
 
 MENU_ICON="$PROJECT_DIR/Sources/QuartzApp/Views/QuartzMenuBarIcon.swift"
 ROOT_VIEW="$PROJECT_DIR/Sources/QuartzApp/Views/RootView.swift"
-if ! rg -q -F 'Image(nsImage: QuartzMenuBarArtwork.image)' "$MENU_ICON" \
-  || ! rg -q -F 'image.isTemplate = true' "$MENU_ICON" \
-  || ! rg -q -F 'QuartzObelisksShape()' "$ROOT_VIEW"; then
+if ! contains_text 'Image(nsImage: QuartzMenuBarArtwork.image)' "$MENU_ICON" \
+  || ! contains_text 'image.isTemplate = true' "$MENU_ICON" \
+  || ! contains_text 'QuartzObelisksShape()' "$ROOT_VIEW"; then
   print -u2 "✗ L’emblème aux trois obélisques doit apparaître dans l’en-tête et la barre macOS"
   exit 1
 fi
 print "✓ L’emblème Quartz est partagé par l’en-tête et la barre des menus"
 
 WINDOW_COORDINATOR="$PROJECT_DIR/Sources/QuartzApp/Services/WindowCoordinator.swift"
-if ! rg -q -F 'expandedMinSize = NSSize(width: 400, height: 372)' "$WINDOW_COORDINATOR" \
-  || ! rg -q -F 'expandedMaxSize = NSSize(width: 600, height: 572)' "$WINDOW_COORDINATOR" \
-  || ! rg -q -F 'expandedMinFrameSize = NSSize(width: 400, height: 400)' "$WINDOW_COORDINATOR" \
-  || ! rg -q -F 'expandedMaxFrameSize = NSSize(width: 600, height: 600)' "$WINDOW_COORDINATOR" \
-  || ! rg -q -F '[.titled, .resizable, .fullSizeContentView]' "$WINDOW_COORDINATOR"; then
+if ! contains_text 'expandedMinSize = NSSize(width: 400, height: 372)' "$WINDOW_COORDINATOR" \
+  || ! contains_text 'expandedMaxSize = NSSize(width: 600, height: 572)' "$WINDOW_COORDINATOR" \
+  || ! contains_text 'expandedMinFrameSize = NSSize(width: 400, height: 400)' "$WINDOW_COORDINATOR" \
+  || ! contains_text 'expandedMaxFrameSize = NSSize(width: 600, height: 600)' "$WINDOW_COORDINATOR" \
+  || ! contains_text '[.titled, .resizable, .fullSizeContentView]' "$WINDOW_COORDINATOR"; then
   print -u2 "✗ La fenêtre dépliée ne conserve plus sa plage native 400 × 400 à 600 × 600 px"
   exit 1
 fi
@@ -97,14 +101,14 @@ print "✓ Le relief du sanctuaire d’obélisques est présent"
 LOCAL_MODEL="$PROJECT_DIR/Sources/QuartzApp/Resources/MLX/quartz-fr/model.safetensors"
 LOCAL_RUNTIME="$PROJECT_DIR/Sources/QuartzApp/Services/LocalMLXRuntime.swift"
 if [[ ! -s "$LOCAL_MODEL" ]] \
-  || ! rg -q -F 'ensureRunning(configuration:' "$LOCAL_RUNTIME" \
-  || ! rg -q -F 'applicationWillTerminate' "$PROJECT_DIR/Sources/QuartzApp/QuartzApp.swift"; then
+  || ! contains_text 'ensureRunning(configuration:' "$LOCAL_RUNTIME" \
+  || ! contains_text 'applicationWillTerminate' "$PROJECT_DIR/Sources/QuartzApp/QuartzApp.swift"; then
   print -u2 "✗ Le modèle MLX doit être une ressource gérée automatiquement par Quartz"
   exit 1
 fi
-if ! rg -q -F 'case unexpectedServer' "$LOCAL_RUNTIME" \
-  || ! rg -q -F 'modelList.data.count == 1' "$LOCAL_RUNTIME" \
-  || ! rg -q -F 'truncate(atOffset: 0)' "$LOCAL_RUNTIME"; then
+if ! contains_text 'case unexpectedServer' "$LOCAL_RUNTIME" \
+  || ! contains_text 'modelList.data.count == 1' "$LOCAL_RUNTIME" \
+  || ! contains_text 'truncate(atOffset: 0)' "$LOCAL_RUNTIME"; then
   print -u2 "✗ Quartz doit refuser un serveur MLX incompatible et borner son journal"
   exit 1
 fi
@@ -113,12 +117,12 @@ print "✓ Le modèle MLX est intégré, identifié et son cycle de vie est gér
 APP_MODEL="$PROJECT_DIR/Sources/QuartzApp/AppModel.swift"
 LLM_COMPOSER="$PROJECT_DIR/Sources/QuartzApp/Views/LLMComposerView.swift"
 SETTINGS_VIEW="$PROJECT_DIR/Sources/QuartzApp/Views/SettingsView.swift"
-if ! rg -q -F 'static let llmEnabled = "llmEnabled"' "$APP_MODEL" \
-  || ! rg -q -F 'func setLLMEnabled(_ enabled: Bool)' "$APP_MODEL" \
-  || ! rg -q -F 'llmRequestTask?.cancel()' "$APP_MODEL" \
-  || ! rg -q -F 'LocalMLXRuntime.shared.stop()' "$APP_MODEL" \
-  || ! rg -q -F 'model.setLLMEnabled(!model.llmEnabled)' "$LLM_COMPOSER" \
-  || ! rg -q -F 'title: "IA locale"' "$SETTINGS_VIEW"; then
+if ! contains_text 'static let llmEnabled = "llmEnabled"' "$APP_MODEL" \
+  || ! contains_text 'func setLLMEnabled(_ enabled: Bool)' "$APP_MODEL" \
+  || ! contains_text 'llmRequestTask?.cancel()' "$APP_MODEL" \
+  || ! contains_text 'LocalMLXRuntime.shared.stop()' "$APP_MODEL" \
+  || ! contains_text 'model.setLLMEnabled(!model.llmEnabled)' "$LLM_COMPOSER" \
+  || ! contains_text 'title: "IA locale"' "$SETTINGS_VIEW"; then
   print -u2 "✗ L’interrupteur de l’IA locale doit rester visible, mémorisé et effectif"
   exit 1
 fi
@@ -127,21 +131,21 @@ print "✓ L’IA locale peut être activée ou coupée depuis Quartz"
 
 RECOVERABLE_STORE="$PROJECT_DIR/Sources/QuartzKit/RecoverableJSONStore.swift"
 PERSISTENCE_TESTS="$PROJECT_DIR/Tests/QuartzKitTests/RecoverableJSONStoreTests.swift"
-if ! rg -q -F 'quarantinePrimaryFile()' "$RECOVERABLE_STORE" \
-  || ! rg -q -F 'backupURL' "$RECOVERABLE_STORE" \
-  || ! rg -q -F 'case failed(JSONFileStoreFailure)' "$RECOVERABLE_STORE" \
+if ! contains_text 'quarantinePrimaryFile()' "$RECOVERABLE_STORE" \
+  || ! contains_text 'backupURL' "$RECOVERABLE_STORE" \
+  || ! contains_text 'case failed(JSONFileStoreFailure)' "$RECOVERABLE_STORE" \
   || [[ ! -s "$PERSISTENCE_TESTS" ]] \
-  || ! rg -q -F 'storageNotice' "$APP_MODEL"; then
+  || ! contains_text 'storageNotice' "$APP_MODEL"; then
   print -u2 "✗ La sauvegarde, la quarantaine et la récupération des données doivent rester actives"
   exit 1
 fi
 print "✓ Les données disposent d’une sauvegarde automatique et d’une récupération testée"
 
 NOTIFICATION_SCHEDULER="$PROJECT_DIR/Sources/QuartzApp/Services/NotificationScheduler.swift"
-if ! rg -q -F 'planningHorizonDays = 365' "$NOTIFICATION_SCHEDULER" \
-  || ! rg -q -F 'failedCount' "$NOTIFICATION_SCHEDULER" \
-  || ! rg -q -F 'content.userInfo' "$NOTIFICATION_SCHEDULER" \
-  || ! rg -q -F 'applyNotificationReport' "$APP_MODEL"; then
+if ! contains_text 'planningHorizonDays = 365' "$NOTIFICATION_SCHEDULER" \
+  || ! contains_text 'failedCount' "$NOTIFICATION_SCHEDULER" \
+  || ! contains_text 'content.userInfo' "$NOTIFICATION_SCHEDULER" \
+  || ! contains_text 'applyNotificationReport' "$APP_MODEL"; then
   print -u2 "✗ Les notifications doivent conserver leur horizon et signaler les échecs"
   exit 1
 fi
@@ -149,20 +153,20 @@ print "✓ Les notifications planifient jusqu’à un an et exposent leurs éche
 
 TASK_LIST="$PROJECT_DIR/Sources/QuartzApp/Views/TaskListView.swift"
 POST_IT_BOARD="$PROJECT_DIR/Sources/QuartzApp/Views/PostItBoardView.swift"
-if ! rg -q -F '.accessibilityActions {' "$TASK_LIST" \
-  || ! rg -q -F 'pendingSave: Task<Void, Never>?' "$POST_IT_BOARD" \
-  || ! rg -q -F '.accessibilityActions {' "$POST_IT_BOARD"; then
+if ! contains_text '.accessibilityActions {' "$TASK_LIST" \
+  || ! contains_text 'pendingSave: Task<Void, Never>?' "$POST_IT_BOARD" \
+  || ! contains_text '.accessibilityActions {' "$POST_IT_BOARD"; then
   print -u2 "✗ Les actions essentielles doivent rester disponibles sans survol et les post-it temporisés"
   exit 1
 fi
 print "✓ Les actions critiques sont accessibles et les post-it évitent les écritures à chaque frappe"
 
 WEEK_STRIP="$PROJECT_DIR/Sources/QuartzApp/Views/RootView.swift"
-if ! rg -q -F 'HStack(spacing: 8)' "$WEEK_STRIP" \
-  || ! rg -q -F '.frame(height: 48)' "$WEEK_STRIP" \
-  || ! rg -q -F '.padding(.horizontal, 14)' "$WEEK_STRIP" \
-  || ! rg -q -F '.padding(.vertical, 7)' "$WEEK_STRIP" \
-  || ! rg -q -F 'lineWidth: 0.75' "$WEEK_STRIP"; then
+if ! contains_text 'HStack(spacing: 8)' "$WEEK_STRIP" \
+  || ! contains_text '.frame(height: 48)' "$WEEK_STRIP" \
+  || ! contains_text '.padding(.horizontal, 14)' "$WEEK_STRIP" \
+  || ! contains_text '.padding(.vertical, 7)' "$WEEK_STRIP" \
+  || ! contains_text 'lineWidth: 0.75' "$WEEK_STRIP"; then
   print -u2 "✗ La bande des sept jours doit conserver sa respiration visuelle"
   exit 1
 fi
