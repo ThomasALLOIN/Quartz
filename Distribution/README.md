@@ -8,6 +8,7 @@ Le design et le parcours fonctionnel de Quartz ont été validés par l’utilis
 - identifiant : `com.thomasalloin.Quartz` ;
 - cible : macOS 14 ou ultérieur, Apple Silicon ;
 - application : `dist/Quartz.app` ;
+- installateur recommandé : `dist/Quartz-macOS-1.0.0.dmg` ;
 - archive : `dist/Quartz-1.0.0-macOS-Apple-Silicon.zip` ;
 - signature actuelle : ad hoc locale, vérifiée avec `codesign` ;
 - icône : galet de lapis texturé avec les trois obélisques et la faille centrale ;
@@ -25,7 +26,9 @@ git lfs pull
 ./Packager.command
 ```
 
-`Packager.command` exécute par défaut `Verifier.command`, compile les deux exécutables en mode release, assemble le bundle et ses ressources, applique la signature, vérifie l’architecture et crée le ZIP.
+`Packager.command` exécute par défaut `Verifier.command`, compile les deux exécutables en mode release, assemble le bundle et ses ressources, applique la signature, vérifie l’architecture puis crée un DMG Finder avec `Quartz.app` et le raccourci **Applications**. Il conserve également le ZIP.
+
+Pour installer Quartz, ouvrir le DMG et glisser l’icône **Quartz** vers **Applications**. L’image disque est ensuite éjectable.
 
 Les valeurs peuvent être adaptées sans modifier le script :
 
@@ -52,7 +55,7 @@ Il reste à :
 
 1. intégrer MLX nativement en Swift ou embarquer proprement son environnement d’exécution ;
 2. signer avec un certificat Apple Developer ID et activer le hardened runtime ;
-3. notariser le ZIP auprès d’Apple puis agrafer le ticket au bundle ;
+3. notariser le DMG auprès d’Apple puis agrafer le ticket à l’image disque ;
 4. tester installation, notifications, migration, IA et fermeture du moteur sur un Mac Apple Silicon propre ;
 5. décider si une version Intel ou universelle est réellement nécessaire.
 

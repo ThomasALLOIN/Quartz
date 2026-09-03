@@ -231,3 +231,12 @@ if ! plutil -lint "$BUNDLE_INFO" >/dev/null \
   exit 1
 fi
 print "✓ Quartz.app dispose de son identité, de son icône et de ses ressources"
+
+if ! contains_text 'hdiutil create' "$PACKAGER" \
+  || ! contains_text 'ln -s /Applications' "$PACKAGER" \
+  || ! contains_text 'hdiutil verify' "$PACKAGER" \
+  || ! contains_text 'Quartz-macOS-$VERSION.dmg' "$PACKAGER"; then
+  print -u2 "✗ Le packager doit produire un installateur DMG vérifié avec le raccourci Applications"
+  exit 1
+fi
+print "✓ L'installateur DMG propose Quartz.app vers Applications"

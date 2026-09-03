@@ -28,11 +28,11 @@ Le design et les fonctions ont été validés le 26 août 2026. Le bundle `1.0.0
 
 ## Utiliser Quartz.app
 
-La version locale générée se trouve dans `dist/Quartz.app` et son archive dans `dist/Quartz-1.0.0-macOS-Apple-Silicon.zip`.
+L'installateur recommandé est `dist/Quartz-macOS-1.0.0.dmg`. Le ZIP et le bundle restent aussi disponibles dans `dist`.
 
-1. Ouvrir le dossier `dist` dans Finder.
-2. Double-cliquer sur **Quartz**.
-3. Dans **Réglages**, activer **Notifications** lorsque macOS demande l’autorisation.
+1. Ouvrir le fichier `.dmg` dans Finder.
+2. Glisser **Quartz** vers le dossier **Applications** affiché dans la fenêtre.
+3. Ouvrir **Quartz** depuis Applications, puis activer **Notifications** dans les réglages lorsque macOS demande l’autorisation.
 
 Le bundle cible macOS 14 ou ultérieur sur Apple Silicon. Les tâches et post-it déjà utilisés dans l’aperçu sont conservés ; les préférences visuelles et la dernière position du widget sont migrées au premier lancement.
 
@@ -42,7 +42,7 @@ Pour reconstruire l’application après une modification :
 ./Packager.command
 ```
 
-La commande vérifie le projet, compile en mode release, assemble les ressources, signe localement le bundle et crée l’archive ZIP. Cette première signature est ad hoc : l’application fonctionne sur ce Mac, mais une diffusion à d’autres utilisateurs exigera un certificat Developer ID et une notarisation Apple. Les détails sont dans [Distribution/README.md](Distribution/README.md).
+La commande vérifie le projet, compile en mode release, assemble les ressources, signe localement le bundle puis crée l’installateur DMG et l’archive ZIP. Cette première signature est ad hoc : l’application fonctionne sur ce Mac, mais une diffusion à d’autres utilisateurs exigera un certificat Developer ID et une notarisation Apple. Les détails sont dans [Distribution/README.md](Distribution/README.md).
 
 ## Récupérer le projet
 

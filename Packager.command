@@ -10,6 +10,8 @@ BUILD_NUMBER="${QUARTZ_BUILD_NUMBER:-1}"
 BUNDLE_ID="${QUARTZ_BUNDLE_ID:-com.thomasalloin.Quartz}"
 SIGN_IDENTITY="${QUARTZ_SIGN_IDENTITY:--}"
 ZIP_PATH="$DIST_DIR/Quartz-$VERSION-macOS-Apple-Silicon.zip"
+DMG_PATH="$DIST_DIR/Quartz-macOS-$VERSION.dmg"
+DMG_VOLUME_NAME="Quartz Installer"
 
 if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] \
   || [[ ! "$BUILD_NUMBER" =~ ^[1-9][0-9]*$ ]] \
@@ -64,6 +66,7 @@ fi
 
 rm -rf "$APP_PATH"
 rm -f "$ZIP_PATH"
+rm -f "$DMG_PATH"
 mkdir -p \
   "$APP_PATH/Contents/MacOS" \
   "$APP_PATH/Contents/Helpers" \
@@ -106,8 +109,55 @@ fi
 
 ditto -c -k --sequesterRsrc --keepParent "$APP_PATH" "$ZIP_PATH"
 
+# L'image disque offre le parcours Finder standard : déposer Quartz dans Applications.
+APP_SIZE_MB="$(du -sm "$APP_PATH" | awk '{print $1}')"
+DMG_SIZE_MB=$((APP_SIZE_MB + 64))
+DMG_WORK_PATH="$(mktemp -d "${TMPDIR:-/private/tmp}/quartz-dmg.XXXXXX")"
+DMG_RW_PATH="$DMG_WORK_PATH/Quartz-installer.dmg"
+DMG_MOUNT_PATH="$DMG_WORK_PATH/mount"
+DMG_CHECK_PATH="$DMG_WORK_PATH/check"
+mkdir -p "$DMG_MOUNT_PATH" "$DMG_CHECK_PATH"
+
+cleanup_dmg() {
+  local original_status=$?
+  hdiutil detach "$DMG_MOUNT_PATH" -quiet 2>/dev/null || true
+  hdiutil detach "$DMG_CHECK_PATH" -quiet 2>/dev/null || true
+  rm -rf "$DMG_WORK_PATH"
+  return "$original_status"
+}
+trap cleanup_dmg EXIT
+
+hdiutil create -quiet \
+  -size "${DMG_SIZE_MB}m" \
+  -fs HFS+ \
+  -volname "$DMG_VOLUME_NAME" \
+  "$DMG_RW_PATH"
+hdiutil attach -quiet -nobrowse -noverify -mountpoint "$DMG_MOUNT_PATH" "$DMG_RW_PATH"
+ditto "$APP_PATH" "$DMG_MOUNT_PATH/Quartz.app"
+ln -s /Applications "$DMG_MOUNT_PATH/Applications"
+touch "$DMG_MOUNT_PATH/.metadata_never_index"
+hdiutil detach "$DMG_MOUNT_PATH" -quiet
+
+hdiutil convert -quiet \
+  "$DMG_RW_PATH" \
+  -format UDZO \
+  -imagekey zlib-level=9 \
+  -o "$DMG_PATH"
+hdiutil verify "$DMG_PATH" >/dev/null
+hdiutil attach -quiet -readonly -nobrowse -mountpoint "$DMG_CHECK_PATH" "$DMG_PATH"
+if [[ ! -d "$DMG_CHECK_PATH/Quartz.app" ]] \
+  || [[ ! -L "$DMG_CHECK_PATH/Applications" ]] \
+  || [[ "$(readlink "$DMG_CHECK_PATH/Applications")" != "/Applications" ]]; then
+  print -u2 "✗ L'installateur DMG ne contient pas Quartz.app et Applications."
+  exit 1
+fi
+hdiutil detach "$DMG_CHECK_PATH" -quiet
+trap - EXIT
+cleanup_dmg
+
 print "✓ Quartz.app assemblé et vérifié"
 print "  Application : $APP_PATH"
+print "  Installateur : $DMG_PATH"
 print "  Archive     : $ZIP_PATH"
 if [[ "$SIGN_IDENTITY" == "-" ]]; then
   print "  Signature   : locale ad hoc (non notarisée)"

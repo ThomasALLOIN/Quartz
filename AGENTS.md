@@ -1,7 +1,7 @@
 # AGENTS.md — Quartz
 
 > Statut : validé
-> Dernière révision : 2026-08-26  
+> Dernière révision : 2026-09-03
 > Validation : utilisateur, confirmation explicite du 26 août 2026
 
 ## 1. Direction du projet
@@ -23,7 +23,7 @@
 - Design confirmé : matériaux inspirés de pierres nobles, aspect tactile et cohérent entre les modes réduit et déplié, avec uniquement deux thèmes sombres à texture raster réelle : Lapis nuit bleu par défaut et Marbre noir veiné gris perle. Les anciens thèmes Jade, Améthyste et Quartz rose sont retirés. En mode déplié, la matière atteint directement les limites de la fenêtre et se prolonge sous la zone de titre invisible : aucune marge transparente ni ombre rectangulaire native de macOS ne doit rester visible derrière son contour, tout en conservant les coins arrondis et la fine bordure dessinée par Quartz. La bande hebdomadaire doit respirer clairement : marges latérales et verticales visibles, séparation nette entre les sept cartes, fin liseré blanc autour de chaque jour et fond des jours non sélectionnés discret, y compris à la taille minimale de 400 px. Les éditeurs doivent évoquer un carnet minéral simple plutôt qu’un formulaire administratif : titres en casse naturelle, peu de cadres imbriqués, réglages regroupés et sous-tâches présentées comme des étapes directement éditables. La pierre réduite adopte une silhouette de massif rocheux aux aiguilles taillées comme des obélisques ; une faille ou un sceau central doit suggérer un secret gardé sans nuire à la lecture. Les ombres du raster séparent nettement les obélisques arrière, tandis qu’aucune plaque translucide ou géométrie floutée ne doit recouvrir le relief au premier plan. Au repos, le massif est rendu à 50 % d’opacité et redevient entièrement opaque dès que le pointeur le survole. Il affiche uniquement le suivi des tâches, sans date ni panneau de fenêtre visible autour du massif.
 - Intégration macOS confirmée : un menu dans la barre des menus doit permettre de masquer ou réafficher le widget sans quitter l’application ; le même emblème monochrome de trois obélisques taillés autour d’une faille centrale doit être réellement visible dans la barre macOS et à gauche du nom Quartz dans l’en-tête. La version de barre est une image AppKit `template` afin de suivre automatiquement les apparences macOS. Toute la silhouette du widget réduit doit être saisissable directement à la souris. Un glisser la déplace puis l’aimante au bord gauche ou droit le plus proche ; un clic bref sans mouvement le déplie vers l’intérieur depuis ce même bord. Sa dernière hauteur et son bord restent mémorisés, indépendamment de la position prise par la grande fenêtre et y compris après relance.
 - Hors périmètre actuel : comptes, collaboration, synchronisation cloud, fournisseurs LLM distants dans le composeur (ChatGPT, Claude ou autre API cloud), exécution d’une commande arbitraire, accès direct depuis un assistant cloud dépourvu d’outil local, versions Windows/Linux et publication/App Store.
-- Livrables : aperçu local, sources versionnées sur `https://github.com/ThomasALLOIN/Quartz`, contrôles locaux et CI, puis `Quartz.app` et son archive Apple Silicon générés après validation explicite.
+- Livrables : aperçu local, sources versionnées sur `https://github.com/ThomasALLOIN/Quartz`, contrôles locaux et CI, puis `Quartz.app`, son installateur DMG Finder et son archive Apple Silicon générés après validation explicite.
 
 ## 4. Priorités et arbitrages
 
@@ -109,6 +109,7 @@
 | 2026-08-31 | Ancrer la pierre compacte aux bords de l’écran | Demande explicite pour éviter un widget visible au milieu du bureau | Après un glisser, Quartz mémorise le bord gauche ou droit le plus proche et la hauteur ; le dépliage s’aligne sur ce bord et s’ouvre vers l’intérieur | validée |
 | 2026-08-31 | Orienter visuellement la pierre selon son bord | Demande explicite de redesign pour les ancrages gauche et droit | La silhouette et le relief sont miroir à droite ; une fine cicatrice et un chevron minéraux pointent vers l’intérieur sans masquer le suivi des tâches | validée |
 | 2026-08-31 | Exposer une passerelle MCP locale pour les agents | Demande explicite de compatibilité Codex et Claude | `quartz-mcp` en `stdio` expose seulement la création de tâches et post-it, validée et déposée atomiquement dans des boîtes locales ; `InstallerMCP.command` installe une copie stable sous les données Quartz, sans API, clé, réseau ou écriture concurrente de données | validée |
+| 2026-09-03 | Distribuer Quartz dans un installateur DMG | Demande explicite d’un parcours Finder à glisser-déposer | `Packager.command` crée un volume « Quartz Installer » contenant `Quartz.app` et le raccourci `Applications`; le ZIP reste disponible | validée |
 
 ## 10. Questions ouvertes
 
