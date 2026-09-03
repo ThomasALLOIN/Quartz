@@ -8,6 +8,7 @@ final class WindowCoordinator {
     private enum PreferenceKey {
         static let compactOriginX = "quartz.window.compactOriginX"
         static let compactOriginY = "quartz.window.compactOriginY"
+        static let compactDockSide = "quartz.window.compactDockSide"
         static let expandedContentWidth = "quartz.window.expandedContentWidth"
         static let expandedContentHeight = "quartz.window.expandedContentHeight"
     }
@@ -29,10 +30,16 @@ final class WindowCoordinator {
     static let expandedMaxFrameSize = NSSize(width: 600, height: 600)
     static let compactSize = NSSize(width: 74, height: 42)
 
+    enum CompactDockSide: String {
+        case left
+        case right
+    }
+
     private var window: NSWindow?
     private var resizeGeneration = 0
     private var appliedCompactState: Bool?
     private var lastCompactOrigin: NSPoint?
+    private var compactDockSide: CompactDockSide
     private var lastExpandedSize = expandedDefaultSize
     private var liveResizeObserver: NSObjectProtocol?
     private var resizeObserver: NSObjectProtocol?
@@ -49,6 +56,9 @@ final class WindowCoordinator {
         {
             lastCompactOrigin = NSPoint(x: x.doubleValue, y: y.doubleValue)
         }
+        compactDockSide = CompactDockSide(
+            rawValue: preferences.string(forKey: PreferenceKey.compactDockSide) ?? ""
+        ) ?? .right
         if
             let width = preferences.object(forKey: PreferenceKey.expandedContentWidth) as? NSNumber,
             let height = preferences.object(forKey: PreferenceKey.expandedContentHeight) as? NSNumber
@@ -80,6 +90,8 @@ final class WindowCoordinator {
         guard let window else { return false }
         return window.isVisible && !window.isMiniaturized && !NSApp.isHidden
     }
+
+    var currentCompactDockSide: CompactDockSide { compactDockSide }
 
     func attach(_ window: NSWindow, compact: Bool, alwaysOnTop: Bool, visible: Bool) {
         let firstAttachment = self.window !== window
@@ -169,8 +181,17 @@ final class WindowCoordinator {
             forContentRect: NSRect(origin: .zero, size: size),
             styleMask: window.styleMask
         )
-        if compact, let lastCompactOrigin {
-            frame.origin = lastCompactOrigin
+        if compact {
+            frame.origin = compactDockedOrigin(
+                preferredY: lastCompactOrigin?.y,
+                in: visibleFrame(containing: oldFrame, fallback: window)
+            )
+        } else if wasCompact {
+            frame.origin = expandedOrigin(
+                for: frame.size,
+                compactFrame: oldFrame,
+                in: visibleFrame(containing: oldFrame, fallback: window)
+            )
         } else {
             // Au tout premier repli seulement, aucune position compacte n'existe
             // encore : le coin supérieur droit fournit un point de départ stable.
@@ -283,11 +304,67 @@ final class WindowCoordinator {
         )
     }
 
-    func rememberCompactOrigin(_ origin: NSPoint) {
-        guard origin.x.isFinite, origin.y.isFinite else { return }
-        lastCompactOrigin = origin
-        preferences.set(Double(origin.x), forKey: PreferenceKey.compactOriginX)
-        preferences.set(Double(origin.y), forKey: PreferenceKey.compactOriginY)
+    @discardableResult
+    func rememberCompactOrigin(_ origin: NSPoint) -> CompactDockSide {
+        guard origin.x.isFinite, origin.y.isFinite else { return compactDockSide }
+        let visible = window.map {
+            visibleFrame(
+                containing: NSRect(origin: origin, size: Self.compactSize),
+                fallback: $0
+            )
+        } ?? nil
+        let snapped = compactDockedOrigin(preferredY: origin.y, in: visible, nearestTo: origin.x)
+        lastCompactOrigin = snapped
+        preferences.set(Double(snapped.x), forKey: PreferenceKey.compactOriginX)
+        preferences.set(Double(snapped.y), forKey: PreferenceKey.compactOriginY)
+        preferences.set(compactDockSide.rawValue, forKey: PreferenceKey.compactDockSide)
+
+        // Au relâchement, la pierre revient au bord plutôt que de rester au
+        // milieu du bureau. Le glisser conserve sa liberté jusqu'à ce moment.
+        if appliedCompactState == true, let window {
+            window.setFrameOrigin(snapped)
+        }
+        return compactDockSide
+    }
+
+    private func compactDockedOrigin(
+        preferredY: CGFloat?,
+        in visible: NSRect?,
+        nearestTo proposedX: CGFloat? = nil
+    ) -> NSPoint {
+        guard let visible else {
+            return lastCompactOrigin ?? .zero
+        }
+
+        if let proposedX {
+            let leftDistance = abs(proposedX - visible.minX)
+            let rightDistance = abs(proposedX - (visible.maxX - Self.compactSize.width))
+            compactDockSide = leftDistance <= rightDistance ? .left : .right
+        }
+
+        let x = compactDockSide == .left
+            ? visible.minX
+            : visible.maxX - Self.compactSize.width
+        let defaultY = visible.midY - Self.compactSize.height / 2
+        let y = min(
+            max(preferredY ?? defaultY, visible.minY),
+            visible.maxY - Self.compactSize.height
+        )
+        return NSPoint(x: x, y: y)
+    }
+
+    private func expandedOrigin(
+        for expandedSize: NSSize,
+        compactFrame: NSRect,
+        in visible: NSRect?
+    ) -> NSPoint {
+        guard let visible else { return compactFrame.origin }
+        let x = compactDockSide == .left
+            ? visible.minX
+            : visible.maxX - expandedSize.width
+        let centeredY = compactFrame.midY - expandedSize.height / 2
+        let y = min(max(centeredY, visible.minY), visible.maxY - expandedSize.height)
+        return NSPoint(x: x, y: y)
     }
 
     private func isSettledCompactFrame(_ frame: NSRect) -> Bool {
@@ -387,7 +464,7 @@ final class WindowCoordinator {
 struct WindowDragArea: NSViewRepresentable {
     enum Region: Equatable {
         case rectangle
-        case obeliskMassif
+        case obeliskMassif(side: WindowCoordinator.CompactDockSide)
     }
 
     enum ContextMenuItem {
@@ -578,10 +655,13 @@ struct WindowDragArea: NSViewRepresentable {
             switch region {
             case .rectangle:
                 return bounds.contains(point)
-            case .obeliskMassif:
+            case let .obeliskMassif(side):
                 // AppKit place l'origine en bas à gauche, tandis que la géométrie
                 // SwiftUI du massif est décrite depuis le haut à gauche.
-                let topDownPoint = CGPoint(x: point.x, y: bounds.height - point.y)
+                var topDownPoint = CGPoint(x: point.x, y: bounds.height - point.y)
+                if side == .right {
+                    topDownPoint.x = bounds.maxX - (topDownPoint.x - bounds.minX)
+                }
                 return ObeliskMassifGeometry.path(in: bounds).contains(topDownPoint)
             }
         }

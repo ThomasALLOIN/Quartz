@@ -12,7 +12,7 @@ Le design et le parcours fonctionnel de Quartz ont été validés par l’utilis
 - signature actuelle : ad hoc locale, vérifiée avec `codesign` ;
 - icône : galet de lapis texturé avec les trois obélisques et la faille centrale ;
 - ressources incluses : textures, relief du widget et modèle français MLX de 136 Mo ;
-- intégration externe : binaire `quartz` inclus dans `Contents/Helpers`.
+- intégration externe : binaires `quartz` et `quartz-mcp` inclus dans `Contents/Helpers`.
 
 Cette version est destinée au Mac de développement et à la validation locale. Elle n’est pas encore notarisée pour une diffusion publique.
 

@@ -4,18 +4,23 @@ struct CompactStoneView: View {
     @EnvironmentObject private var model: AppModel
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var isHovered = false
+    @State private var dockSide = WindowCoordinator.shared.currentCompactDockSide
 
     private var palette: StonePalette { model.theme.palette }
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: 1)) { context in
             let dueTasks = model.tasksDueNow(at: context.date)
+            let additionalDueTasks = max(0, dueTasks.count - 1)
             ZStack {
             StoneFill(palette: palette, compact: true)
-                .clipShape(ObeliskMassifShape())
+                .clipShape(DockedObeliskMassifShape(side: dockSide))
 
             ObeliskRelief(palette: palette)
-                .clipShape(ObeliskMassifShape())
+                .scaleEffect(x: dockSide == .right ? -1 : 1, y: 1)
+                .clipShape(DockedObeliskMassifShape(side: dockSide))
+
+            DockEdgeSeal(palette: palette, side: dockSide)
 
             SecretCleftMark(palette: palette)
                 .frame(width: 4, height: 12.5)
@@ -56,24 +61,24 @@ struct CompactStoneView: View {
             if let currentTask = dueTasks.first {
                 CompactDueTaskPill(
                     title: currentTask.title,
-                    additionalCount: max(0, dueTasks.count - 1)
+                    additionalCount: additionalDueTasks
                 )
                 .offset(y: 7)
                 .transition(.scale(scale: 0.82).combined(with: .opacity))
             }
         }
-        .clipShape(ObeliskMassifShape())
+        .clipShape(DockedObeliskMassifShape(side: dockSide))
         .overlay {
             ZStack {
                 WindowDragArea(
-                    region: .obeliskMassif,
+                    region: .obeliskMassif(side: dockSide),
                     onClick: { model.setCompact(false) },
-                    onMove: { WindowCoordinator.shared.rememberCompactOrigin($0) },
+                    onMove: { dockSide = WindowCoordinator.shared.rememberCompactOrigin($0) },
                     contextMenuItems: compactContextMenuItems
                 )
                 .accessibilityHidden(true)
 
-                ObeliskMassifShape()
+                DockedObeliskMassifShape(side: dockSide)
                     .stroke(
                         LinearGradient(
                             colors: [Color.white.opacity(0.54), palette.stoneDark.opacity(0.46)],
@@ -84,10 +89,10 @@ struct CompactStoneView: View {
                     )
                     .allowsHitTesting(false)
             }
-            .clipShape(ObeliskMassifShape())
+            .clipShape(DockedObeliskMassifShape(side: dockSide))
         }
         .shadow(color: palette.shadow, radius: 3.5, y: 1.5)
-        .contentShape(ObeliskMassifShape())
+        .contentShape(DockedObeliskMassifShape(side: dockSide))
         .padding(1.5)
         .opacity(isHovered || !dueTasks.isEmpty ? 1 : 0.5)
         .animation(reduceMotion ? nil : .easeOut(duration: 0.09), value: isHovered)
@@ -95,12 +100,15 @@ struct CompactStoneView: View {
         .onHover { hovering in
             isHovered = hovering
         }
+        .onAppear {
+            dockSide = WindowCoordinator.shared.currentCompactDockSide
+        }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(
             dueTasks.first.map { "Échéance maintenant, \($0.title)" }
                 ?? "Quartz réduit, \(model.remainingCount) tâches restantes, \(model.dayProgressPercent) pour cent accomplis"
         )
-        .accessibilityHint("Cliquer pour déplier Quartz, ou faire glisser la pierre pour la déplacer")
+        .accessibilityHint("Ancré à gauche ou à droite selon sa position. Cliquer pour déplier Quartz vers l’intérieur, ou faire glisser la pierre vers l’autre bord.")
         .accessibilityAddTraits(.isButton)
         .accessibilityAction {
             model.setCompact(false)
@@ -150,6 +158,45 @@ struct CompactStoneView: View {
         ]
     }
 
+}
+
+/// Le massif se retourne avec son ancrage : ses plans et ses aiguilles semblent
+/// ainsi provenir du bord de l’écran, au lieu d’être un même objet posé à gauche
+/// comme à droite.
+private struct DockedObeliskMassifShape: Shape {
+    let side: WindowCoordinator.CompactDockSide
+
+    func path(in rect: CGRect) -> Path {
+        var path = Path(ObeliskMassifGeometry.path(in: rect))
+        guard side == .right else { return path }
+        path = path.applying(
+            CGAffineTransform(translationX: rect.midX * 2, y: 0).scaledBy(x: -1, y: 1)
+        )
+        return path
+    }
+}
+
+/// Fine cicatrice minérale au contact du bord et chevron très discret vers la
+/// zone où Quartz va se déployer. Il ne remplace ni le clic ni la silhouette.
+private struct DockEdgeSeal: View {
+    let palette: StonePalette
+    let side: WindowCoordinator.CompactDockSide
+
+    var body: some View {
+        HStack(spacing: 3) {
+            Capsule()
+                .fill(palette.vein.opacity(0.62))
+                .frame(width: 1.15, height: 17)
+                .shadow(color: Color.black.opacity(0.42), radius: 0.8, x: 0.45)
+            Image(systemName: side == .left ? "chevron.right" : "chevron.left")
+                .font(.system(size: 5, weight: .bold))
+                .foregroundStyle(palette.text.opacity(0.72))
+        }
+        .frame(width: 14, height: 21)
+        .offset(x: side == .left ? -26 : 26, y: 5)
+        .accessibilityHidden(true)
+        .allowsHitTesting(false)
+    }
 }
 
 private struct CompactDueTaskPill: View {

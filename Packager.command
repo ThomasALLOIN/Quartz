@@ -37,12 +37,14 @@ fi
 
 swift build -c release --product QuartzPreview
 swift build -c release --product quartz
+swift build -c release --product quartz-mcp
 BIN_DIR="$(swift build -c release --show-bin-path)"
 RESOURCE_BUNDLE="$BIN_DIR/Quartz_QuartzApp.bundle"
 
 for required_path in \
   "$BIN_DIR/QuartzPreview" \
   "$BIN_DIR/quartz" \
+  "$BIN_DIR/quartz-mcp" \
   "$RESOURCE_BUNDLE/model.safetensors" \
   "$RESOURCE_BUNDLE/lapis.jpg" \
   "$RESOURCE_BUNDLE/black-marble.png" \
@@ -69,6 +71,7 @@ mkdir -p \
 
 install -m 755 "$BIN_DIR/QuartzPreview" "$APP_PATH/Contents/MacOS/Quartz"
 install -m 755 "$BIN_DIR/quartz" "$APP_PATH/Contents/Helpers/quartz"
+install -m 755 "$BIN_DIR/quartz-mcp" "$APP_PATH/Contents/Helpers/quartz-mcp"
 cp "$PROJECT_DIR/Distribution/Info.plist" "$APP_PATH/Contents/Info.plist"
 cp "$PROJECT_DIR/Distribution/Quartz.icns" "$APP_PATH/Contents/Resources/Quartz.icns"
 cp -R "$RESOURCE_BUNDLE" "$APP_PATH/Contents/Resources/Quartz_QuartzApp.bundle"
@@ -86,6 +89,7 @@ else
 fi
 
 codesign "${SIGN_ARGUMENTS[@]}" "$APP_PATH/Contents/Helpers/quartz"
+codesign "${SIGN_ARGUMENTS[@]}" "$APP_PATH/Contents/Helpers/quartz-mcp"
 codesign "${SIGN_ARGUMENTS[@]}" "$APP_PATH/Contents/MacOS/Quartz"
 codesign --deep "${SIGN_ARGUMENTS[@]}" "$APP_PATH"
 codesign --verify --deep --strict --verbose=2 "$APP_PATH"

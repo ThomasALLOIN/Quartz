@@ -42,6 +42,8 @@ for required_path in \
   Sources/QuartzKit \
   Sources/QuartzApp \
   Sources/QuartzCLI \
+  Sources/QuartzMCP \
+  InstallerMCP.command \
   Sources/QuartzChecks \
   Quartz.command \
   Integrations/quartz-task.schema.json; do
@@ -61,6 +63,26 @@ if git grep -n -I -E "$OLD_NAME_PATTERN" -- . \
   exit 1
 fi
 print "✓ Le projet, ses modules et ses commandes portent le nom Quartz"
+
+MCP_SERVER="$PROJECT_DIR/Sources/QuartzMCP/main.swift"
+POST_IT_INBOX="$PROJECT_DIR/Sources/QuartzApp/Services/ExternalPostItInboxMonitor.swift"
+if [[ ! -s "$MCP_SERVER" ]] \
+  || [[ ! -s "$POST_IT_INBOX" ]] \
+  || ! contains_text 'quartz_create_task' "$MCP_SERVER" \
+  || ! contains_text 'quartz_create_note' "$MCP_SERVER" \
+  || ! contains_text 'ExternalPostItInbox' "$PROJECT_DIR/Sources/QuartzKit/ExternalIntegration.swift"; then
+  print -u2 "✗ Le serveur MCP Quartz doit créer des tâches et des post-it via des boîtes locales"
+  exit 1
+fi
+print "✓ Le serveur MCP local expose des tâches et post-it protégés"
+
+MCP_INSTALLER="$PROJECT_DIR/InstallerMCP.command"
+if ! contains_text 'Library/Application Support/Quartz' "$MCP_INSTALLER" \
+  || ! contains_text 'codesign --verify --strict' "$MCP_INSTALLER"; then
+  print -u2 "✗ L’installateur MCP doit fournir un binaire stable et vérifié hors du projet"
+  exit 1
+fi
+print "✓ L’installateur MCP fournit un binaire stable hors du projet"
 
 MENU_ICON="$PROJECT_DIR/Sources/QuartzApp/Views/QuartzMenuBarIcon.swift"
 ROOT_VIEW="$PROJECT_DIR/Sources/QuartzApp/Views/RootView.swift"
@@ -82,6 +104,24 @@ if ! contains_text 'expandedMinSize = NSSize(width: 400, height: 372)' "$WINDOW_
   exit 1
 fi
 print "✓ La fenêtre dépliée reste redimensionnable de 400 × 400 à 600 × 600 px"
+
+if ! contains_text 'static let compactDockSide = "quartz.window.compactDockSide"' "$WINDOW_COORDINATOR" \
+  || ! contains_text 'enum CompactDockSide' "$WINDOW_COORDINATOR" \
+  || ! contains_text 'compactDockedOrigin' "$WINDOW_COORDINATOR" \
+  || ! contains_text 'expandedOrigin' "$WINDOW_COORDINATOR"; then
+  print -u2 "✗ La pierre réduite doit rester aimantée à un bord et déplier Quartz vers l’intérieur"
+  exit 1
+fi
+print "✓ La pierre réduite s’aimante à un bord et déplie Quartz vers l’intérieur"
+
+COMPACT_STONE="$PROJECT_DIR/Sources/QuartzApp/Views/CompactStoneView.swift"
+if ! contains_text 'DockedObeliskMassifShape' "$COMPACT_STONE" \
+  || ! contains_text 'DockEdgeSeal' "$COMPACT_STONE" \
+  || ! contains_text 'case obeliskMassif(side: WindowCoordinator.CompactDockSide)' "$WINDOW_COORDINATOR"; then
+  print -u2 "✗ La pierre doit adapter sa silhouette et son repère au bord gauche ou droit"
+  exit 1
+fi
+print "✓ La pierre adapte sa silhouette et son repère à chaque bord"
 
 TEXTURE_DIR="$PROJECT_DIR/Sources/QuartzApp/Resources/Textures"
 for texture in lapis.jpg black-marble.png; do

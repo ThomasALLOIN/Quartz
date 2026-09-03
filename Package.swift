@@ -12,7 +12,8 @@ let package = Package(
         .library(name: "QuartzKit", targets: ["QuartzKit"]),
         .executable(name: "QuartzPreview", targets: ["QuartzApp"]),
         .executable(name: "QuartzChecks", targets: ["QuartzChecks"]),
-        .executable(name: "quartz", targets: ["QuartzCLI"])
+        .executable(name: "quartz", targets: ["QuartzCLI"]),
+        .executable(name: "quartz-mcp", targets: ["QuartzMCP"])
     ],
     targets: [
         .target(name: "QuartzKit"),
@@ -29,6 +30,10 @@ let package = Package(
         ),
         .executableTarget(
             name: "QuartzCLI",
+            dependencies: ["QuartzKit"]
+        ),
+        .executableTarget(
+            name: "QuartzMCP",
             dependencies: ["QuartzKit"]
         ),
         .testTarget(

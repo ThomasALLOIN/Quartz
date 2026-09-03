@@ -54,6 +54,13 @@ public struct ExternalSubtaskDraft: Codable, Equatable, Sendable {
     }
 }
 
+/// Détermine où une demande d'agent est affichée. Les anciennes demandes
+/// continuent d'utiliser la destination post-it active de l'application.
+public enum ExternalTaskDestination: String, Codable, Equatable, Sendable {
+    case task
+    case activePostIt
+}
+
 public struct ExternalTaskRequest: Codable, Equatable, Identifiable, Sendable {
     public static let currentVersion = 1
 
@@ -61,6 +68,7 @@ public struct ExternalTaskRequest: Codable, Equatable, Identifiable, Sendable {
     public var id: UUID
     public var createdAt: Date
     public var source: String?
+    public var destination: ExternalTaskDestination
     public var title: String
     public var startDate: Date
     public var dueMinutes: Int?
@@ -74,6 +82,7 @@ public struct ExternalTaskRequest: Codable, Equatable, Identifiable, Sendable {
         id: UUID = UUID(),
         createdAt: Date = Date(),
         source: String? = nil,
+        destination: ExternalTaskDestination = .activePostIt,
         title: String,
         startDate: Date,
         dueMinutes: Int? = nil,
@@ -86,6 +95,7 @@ public struct ExternalTaskRequest: Codable, Equatable, Identifiable, Sendable {
         self.id = id
         self.createdAt = createdAt
         self.source = source
+        self.destination = destination
         self.title = title
         self.startDate = startDate
         self.dueMinutes = dueMinutes
@@ -137,6 +147,44 @@ public struct ExternalTaskRequest: Codable, Equatable, Identifiable, Sendable {
             subtasks: cleanSubtasks,
             createdAt: createdAt
         )
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case version, id, createdAt, source, destination, title, startDate
+        case dueMinutes, recurrence, reminder, notes, subtasks
+    }
+
+    public init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        version = try values.decode(Int.self, forKey: .version)
+        id = try values.decode(UUID.self, forKey: .id)
+        createdAt = try values.decode(Date.self, forKey: .createdAt)
+        source = try values.decodeIfPresent(String.self, forKey: .source)
+        destination = try values.decodeIfPresent(ExternalTaskDestination.self, forKey: .destination)
+            ?? .activePostIt
+        title = try values.decode(String.self, forKey: .title)
+        startDate = try values.decode(Date.self, forKey: .startDate)
+        dueMinutes = try values.decodeIfPresent(Int.self, forKey: .dueMinutes)
+        recurrence = try values.decode(RecurrenceRule.self, forKey: .recurrence)
+        reminder = try values.decode(ReminderOption.self, forKey: .reminder)
+        notes = try values.decode(String.self, forKey: .notes)
+        subtasks = try values.decode([ExternalSubtaskDraft].self, forKey: .subtasks)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var values = encoder.container(keyedBy: CodingKeys.self)
+        try values.encode(version, forKey: .version)
+        try values.encode(id, forKey: .id)
+        try values.encode(createdAt, forKey: .createdAt)
+        try values.encodeIfPresent(source, forKey: .source)
+        try values.encode(destination, forKey: .destination)
+        try values.encode(title, forKey: .title)
+        try values.encode(startDate, forKey: .startDate)
+        try values.encodeIfPresent(dueMinutes, forKey: .dueMinutes)
+        try values.encode(recurrence, forKey: .recurrence)
+        try values.encode(reminder, forKey: .reminder)
+        try values.encode(notes, forKey: .notes)
+        try values.encode(subtasks, forKey: .subtasks)
     }
 }
 
@@ -270,5 +318,143 @@ public struct ExternalTaskInbox {
             [.posixPermissions: 0o700],
             ofItemAtPath: rejectedDirectoryURL.path
         )
+    }
+}
+
+public struct ExternalPostItRequest: Codable, Equatable, Identifiable, Sendable {
+    public static let currentVersion = 1
+
+    public var version: Int
+    public var id: UUID
+    public var createdAt: Date
+    public var source: String?
+    public var text: String
+    public var scope: PostItScope
+    public var date: Date?
+
+    public init(
+        version: Int = ExternalPostItRequest.currentVersion,
+        id: UUID = UUID(),
+        createdAt: Date = Date(),
+        source: String? = nil,
+        text: String,
+        scope: PostItScope = .persistent,
+        date: Date? = nil
+    ) {
+        self.version = version
+        self.id = id
+        self.createdAt = createdAt
+        self.source = source
+        self.text = text
+        self.scope = scope
+        self.date = date
+    }
+
+    public func makePostIt(calendar: Calendar = .french) throws -> PostItNote {
+        guard version == Self.currentVersion else {
+            throw ExternalTaskValidationError.unsupportedVersion(version)
+        }
+        let cleanText = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !cleanText.isEmpty else { throw ExternalTaskValidationError.emptyTitle }
+        guard cleanText.count <= 10_000 else { throw ExternalTaskValidationError.notesTooLong }
+        if scope == .daily, date == nil { throw ExternalPostItValidationError.dailyRequiresDate }
+
+        return PostItNote(
+            id: id,
+            text: cleanText,
+            tone: scope == .daily ? .sage : .parchment,
+            scope: scope,
+            dayKey: date.map { LocalDay.key(for: $0, calendar: calendar) },
+            createdAt: createdAt,
+            updatedAt: createdAt
+        )
+    }
+}
+
+public enum ExternalPostItValidationError: Error, LocalizedError, Sendable {
+    case dailyRequiresDate
+
+    public var errorDescription: String? {
+        "Un post-it daily nécessite une date."
+    }
+}
+
+public struct ExternalPostItInbox {
+    public let directoryURL: URL
+    public let rejectedDirectoryURL: URL
+
+    private let encoder: JSONEncoder
+    private let decoder: JSONDecoder
+
+    public init(directoryURL: URL? = nil) {
+        let root = directoryURL
+            ?? QuartzPaths.applicationSupportDirectory()
+                .appendingPathComponent("PostItInbox", isDirectory: true)
+        self.directoryURL = root
+        self.rejectedDirectoryURL = root.appendingPathComponent("Rejected", isDirectory: true)
+        encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        encoder.dateEncodingStrategy = .iso8601
+        decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+    }
+
+    @discardableResult
+    public func enqueue(_ request: ExternalPostItRequest) throws -> URL {
+        _ = try request.makePostIt()
+        try prepareDirectories()
+        let destination = directoryURL.appendingPathComponent("\(request.id.uuidString).json")
+        let data = try encoder.encode(request)
+        try data.write(to: destination, options: .atomic)
+        try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: destination.path)
+        return destination
+    }
+
+    public func pendingFiles() throws -> [URL] {
+        try prepareDirectories()
+        return try FileManager.default.contentsOfDirectory(
+            at: directoryURL,
+            includingPropertiesForKeys: [.fileSizeKey, .isRegularFileKey],
+            options: [.skipsHiddenFiles]
+        )
+        .filter { $0.pathExtension.lowercased() == "json" }
+        .sorted { $0.lastPathComponent < $1.lastPathComponent }
+    }
+
+    public func decode(_ fileURL: URL) throws -> ExternalPostItRequest {
+        let values = try fileURL.resourceValues(forKeys: [.fileSizeKey, .isRegularFileKey])
+        guard values.isRegularFile == true else { throw CocoaError(.fileReadInvalidFileName) }
+        guard (values.fileSize ?? 0) <= 256 * 1_024 else { throw ExternalTaskInboxError.requestTooLarge }
+        return try decoder.decode(ExternalPostItRequest.self, from: Data(contentsOf: fileURL))
+    }
+
+    public func markProcessed(_ fileURL: URL) throws {
+        guard FileManager.default.fileExists(atPath: fileURL.path) else { return }
+        try FileManager.default.removeItem(at: fileURL)
+    }
+
+    public func reject(_ fileURL: URL) throws {
+        try prepareDirectories()
+        guard FileManager.default.fileExists(atPath: fileURL.path) else { return }
+        var destination = rejectedDirectoryURL.appendingPathComponent(fileURL.lastPathComponent)
+        if FileManager.default.fileExists(atPath: destination.path) {
+            destination = rejectedDirectoryURL.appendingPathComponent("\(UUID().uuidString)-\(fileURL.lastPathComponent)")
+        }
+        try FileManager.default.moveItem(at: fileURL, to: destination)
+    }
+
+    private func prepareDirectories() throws {
+        try FileManager.default.createDirectory(
+            at: directoryURL,
+            withIntermediateDirectories: true,
+            attributes: [.posixPermissions: 0o700]
+        )
+        try FileManager.default.createDirectory(
+            at: rejectedDirectoryURL,
+            withIntermediateDirectories: true,
+            attributes: [.posixPermissions: 0o700]
+        )
+        try? FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: directoryURL.path)
+        try? FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: rejectedDirectoryURL.path)
     }
 }

@@ -388,6 +388,36 @@ do {
     failures.append("Le cycle de la boîte de réception locale a échoué : \(error)")
 }
 
+do {
+    let postItID = UUID(uuidString: "2BCB4FC1-423B-412A-9559-C6AFB3CB1784")!
+    let request = ExternalPostItRequest(
+        id: postItID,
+        createdAt: date(2026, 8, 12),
+        source: "mcp",
+        text: "  Penser aux fleurs  ",
+        scope: .daily,
+        date: date(2026, 8, 14)
+    )
+    let postIt = try request.makePostIt(calendar: calendar)
+    expect(postIt.id == postItID, "Un post-it MCP doit conserver son identifiant")
+    expect(postIt.text == "Penser aux fleurs", "Le texte d’un post-it MCP doit être nettoyé")
+    expect(postIt.scope == .daily, "Le type daily d’un post-it MCP doit être conservé")
+    expect(postIt.dayKey == "2026-08-14", "Un post-it daily doit garder sa journée")
+
+    let temporaryRoot = FileManager.default.temporaryDirectory
+        .appendingPathComponent("quartz-post-it-checks-\(UUID().uuidString)", isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: temporaryRoot) }
+    let inbox = ExternalPostItInbox(directoryURL: temporaryRoot.appendingPathComponent("PostItInbox"))
+    let queuedURL = try inbox.enqueue(request)
+    expect(FileManager.default.fileExists(atPath: queuedURL.path), "La boîte post-it doit écrire une requête atomique")
+    let pending = try inbox.pendingFiles()
+    expect(pending.count == 1, "La boîte post-it doit lister une requête en attente")
+    let decoded = try inbox.decode(pending[0])
+    expect(decoded == request, "Un post-it en attente doit survivre au cycle JSON")
+} catch {
+    failures.append("Le cycle de la boîte post-it MCP a échoué : \(error)")
+}
+
 let overriddenSupport = QuartzPaths.applicationSupportDirectory(
     environment: ["QUARTZ_SUPPORT_DIR": "/private/tmp/quartz-override-check"]
 )

@@ -42,6 +42,7 @@ final class AppModel: ObservableObject {
     private let notificationScheduler = NotificationScheduler()
     private let postItPersistence = PostItPersistence()
     private let externalTaskInbox = ExternalTaskInboxMonitor()
+    private let externalPostItInbox = ExternalPostItInboxMonitor()
     private let defaults = UserDefaults.standard
 
     @Published private(set) var tasks: [TodoTask] {
@@ -174,6 +175,9 @@ final class AppModel: ObservableObject {
 
         externalTaskInbox.start { [weak self] request in
             try self?.importExternalTask(request)
+        }
+        externalPostItInbox.start { [weak self] request in
+            try self?.importExternalPostIt(request)
         }
 
         Task {
@@ -835,7 +839,7 @@ final class AppModel: ObservableObject {
 
     private func importExternalTask(_ request: ExternalTaskRequest) throws {
         let importedTask = try request.makeTask(calendar: calendar)
-        if postItModeEnabled {
+        if request.destination == .activePostIt, postItModeEnabled {
             guard !postIts.contains(where: { $0.id == request.id }) else { return }
             let scope: PostItScope = postItMode == .daily ? .daily : .persistent
             postIts.insert(
@@ -856,6 +860,12 @@ final class AppModel: ObservableObject {
             guard !tasks.contains(where: { $0.id == request.id }) else { return }
             tasks.append(importedTask)
         }
+    }
+
+    private func importExternalPostIt(_ request: ExternalPostItRequest) throws {
+        let importedPostIt = try request.makePostIt(calendar: calendar)
+        guard !postIts.contains(where: { $0.id == importedPostIt.id }) else { return }
+        postIts.insert(importedPostIt, at: 0)
     }
 
     private func revealExpandedWidget() {

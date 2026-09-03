@@ -20,7 +20,7 @@ Quartz est désormais livré comme une **application macOS locale**, tout en con
 - deux textures minérales réelles mises en cache pour une transition fluide : **Lapis nuit** bleu et **Marbre noir** veiné gris perle ;
 - réduction/dépliage rapides, avec retour automatique à la dernière position de la pierre compacte ;
 - toujours visible, sons et menu de barre macOS avec l’option « Afficher le widget ».
-- passerelle locale `Quartz.command` pour permettre aux agents et LLM outillés d’ajouter des tâches sans modifier directement les données.
+- passerelle locale `Quartz.command` et serveur MCP `quartz-mcp` pour permettre à Codex, Claude et aux autres agents MCP de créer tâches et post-it sans modifier directement les données.
 - composeur relié à un unique petit modèle local MLX spécialisé en français, inclus dans les ressources de Quartz et démarré automatiquement en arrière-plan au premier envoi, sans Terminal ni fournisseur distant ; chaque proposition ouvre l’éditeur pour confirmation avant création.
 - interrupteur « IA locale » mémorisé dans le composeur et les réglages : le couper annule l’analyse en cours, empêche tout nouvel envoi et arrête le moteur démarré par Quartz.
 
@@ -83,7 +83,7 @@ Pour créer des notes hors calendrier, cliquer sur le bouton **post-it** dans l�
 
 L’icône aux trois obélisques reste disponible dans la barre des menus macOS. Son interrupteur **Afficher le widget** masque ou rappelle la pierre sans quitter Quartz.
 
-Pour déplacer la pierre réduite, saisissez-la n’importe où et faites-la glisser. Un clic bref sans mouvement la déplie. En mode déplié, faites glisser l’en-tête : au prochain repli, la pierre reviendra exactement à sa dernière position compacte.
+Pour déplacer la pierre réduite, saisissez-la n’importe où et faites-la glisser. Au relâchement, elle s’aimante au bord gauche ou droit le plus proche : elle ne reste donc jamais au milieu de l’écran. Un clic bref sans mouvement déplie Quartz vers l’intérieur depuis ce même bord. En mode déplié, faites glisser l’en-tête : au prochain repli, la pierre reviendra à son bord et à sa dernière hauteur compacte.
 
 ## Vérifier le projet
 
@@ -114,6 +114,12 @@ Le bouton **Afficher** de la section **Données** ouvre directement ce dossier. 
 Quartz importe la demande lorsqu’il est ouvert ou au prochain lancement. Les options, le format JSON et une instruction prête à donner à ChatGPT, Claude, Hermes, OpenCode ou un LLM local sont détaillés dans [INTEGRATION_LLM.md](INTEGRATION_LLM.md).
 
 Dans l’application empaquetée, la même commande est disponible à l’emplacement `Quartz.app/Contents/Helpers/quartz`.
+
+## Connecter Codex ou Claude à Quartz
+
+Quartz embarque un serveur MCP local standard, sans réseau ni clé. Il expose deux outils : `quartz_create_task` et `quartz_create_note`. Ils déposent des requêtes validées dans des boîtes locales privées ; Quartz les importe lorsqu’il est ouvert ou au lancement suivant.
+
+Les configurations pour Codex et Claude Desktop sont dans [QUARTZ_MCP.md](QUARTZ_MCP.md). Lancez `InstallerMCP.command` pour installer une copie stable du serveur dans les données Quartz, indépendamment du chemin du projet ou du bundle.
 
 ## Raccourcis
 
