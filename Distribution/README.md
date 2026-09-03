@@ -2,20 +2,21 @@
 
 Le design et le parcours fonctionnel de Quartz ont été validés par l’utilisateur le 26 août 2026. La génération du `.app` est donc autorisée.
 
-## Première livraison locale
+## Livraison publique notarisée
 
-- version : `1.0.0` (`CFBundleVersion` 1) ;
+- version : `1.0.1` (`CFBundleVersion` 2) ;
 - identifiant : `com.thomasalloin.Quartz` ;
 - cible : macOS 14 ou ultérieur, Apple Silicon ;
 - application : `dist/Quartz.app` ;
-- installateur recommandé : `dist/Quartz-macOS-1.0.0.dmg` ;
-- archive : `dist/Quartz-1.0.0-macOS-Apple-Silicon.zip` ;
-- signature actuelle : ad hoc locale, vérifiée avec `codesign` ;
+- installateur recommandé : `dist/Quartz-macOS-1.0.1.dmg` ;
+- archive complémentaire : `dist/Quartz-1.0.1-macOS-Apple-Silicon.zip` ;
+- signature : `Developer ID Application: Thomas ALLOIN (VH4KX3SZUY)`, avec hardened runtime et horodatage ;
+- notarisation : acceptée par Apple et ticket agrafé au DMG ;
 - icône : galet de lapis texturé avec les trois obélisques et la faille centrale ;
 - ressources incluses : textures, relief du widget et modèle français MLX de 136 Mo ;
 - intégration externe : binaires `quartz` et `quartz-mcp` inclus dans `Contents/Helpers`.
 
-Cette version est destinée au Mac de développement et à la validation locale. Elle n’est pas encore notarisée pour une diffusion publique.
+L’installateur DMG est destiné à une distribution directe : il est reconnu par Gatekeeper comme provenant d’un « Notarized Developer ID ».
 
 ## Construire l’application
 
@@ -36,10 +37,12 @@ Les valeurs peuvent être adaptées sans modifier le script :
 QUARTZ_VERSION=1.0.1 \
 QUARTZ_BUILD_NUMBER=2 \
 QUARTZ_BUNDLE_ID=com.thomasalloin.Quartz \
+QUARTZ_SIGN_IDENTITY='Developer ID Application: Thomas ALLOIN (VH4KX3SZUY)' \
+QUARTZ_NOTARY_PROFILE=QuartzNotary \
 ./Packager.command
 ```
 
-Une identité Apple peut être fournie plus tard avec `QUARTZ_SIGN_IDENTITY`. Sans cette variable, le script utilise volontairement la signature ad hoc `-`.
+`QuartzNotary` est un profil local du trousseau macOS : il référence la clé d’API Apple sans l’exposer dans le projet. Sans identité ni profil, le script conserve le mode de développement ad hoc ; il refuse en revanche une notarisation sans signature Developer ID.
 
 ## Fonctionnement du bundle
 
@@ -49,14 +52,12 @@ Les notifications locales sont disponibles parce que l’application possède d�
 
 Le modèle spécialisé est embarqué. Le moteur exécutable `mlx_lm.server` reste temporairement une dépendance installée sur le Mac ; Quartz le détecte, le lance sur `127.0.0.1`, refuse un serveur incompatible et arrête uniquement le processus qu’il a créé.
 
-## Avant une diffusion à d’autres utilisateurs
+## Points à vérifier pour les prochaines versions
 
 Il reste à :
 
 1. intégrer MLX nativement en Swift ou embarquer proprement son environnement d’exécution ;
-2. signer avec un certificat Apple Developer ID et activer le hardened runtime ;
-3. notariser le DMG auprès d’Apple puis agrafer le ticket à l’image disque ;
-4. tester installation, notifications, migration, IA et fermeture du moteur sur un Mac Apple Silicon propre ;
-5. décider si une version Intel ou universelle est réellement nécessaire.
+2. tester installation, notifications, migration, IA et fermeture du moteur sur un Mac Apple Silicon propre ;
+3. décider si une version Intel ou universelle est réellement nécessaire.
 
 Une publication App Store, iCloud et Calendrier Apple reste hors du périmètre actuel.

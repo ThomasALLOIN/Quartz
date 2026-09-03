@@ -9,6 +9,7 @@ VERSION="${QUARTZ_VERSION:-1.0.0}"
 BUILD_NUMBER="${QUARTZ_BUILD_NUMBER:-1}"
 BUNDLE_ID="${QUARTZ_BUNDLE_ID:-com.thomasalloin.Quartz}"
 SIGN_IDENTITY="${QUARTZ_SIGN_IDENTITY:--}"
+NOTARY_PROFILE="${QUARTZ_NOTARY_PROFILE:-}"
 ZIP_PATH="$DIST_DIR/Quartz-$VERSION-macOS-Apple-Silicon.zip"
 DMG_PATH="$DIST_DIR/Quartz-macOS-$VERSION.dmg"
 DMG_VOLUME_NAME="Quartz Installer"
@@ -17,6 +18,11 @@ if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] \
   || [[ ! "$BUILD_NUMBER" =~ ^[1-9][0-9]*$ ]] \
   || [[ ! "$BUNDLE_ID" =~ ^[A-Za-z0-9]+(\.[A-Za-z0-9-]+)+$ ]]; then
   print -u2 "✗ Version, numéro de build ou identifiant de bundle invalide."
+  exit 1
+fi
+
+if [[ -n "$NOTARY_PROFILE" && "$SIGN_IDENTITY" == "-" ]]; then
+  print -u2 "✗ La notarisation requiert une identité Developer ID, pas une signature ad hoc."
   exit 1
 fi
 
@@ -152,6 +158,16 @@ if [[ ! -d "$DMG_CHECK_PATH/Quartz.app" ]] \
   exit 1
 fi
 hdiutil detach "$DMG_CHECK_PATH" -quiet
+
+if [[ -n "$NOTARY_PROFILE" ]]; then
+  print "• Envoi du DMG à Apple pour notarisation…"
+  xcrun notarytool submit "$DMG_PATH" \
+    --keychain-profile "$NOTARY_PROFILE" \
+    --wait
+  xcrun stapler staple -v "$DMG_PATH"
+  xcrun stapler validate -v "$DMG_PATH"
+fi
+
 trap - EXIT
 cleanup_dmg
 
@@ -163,4 +179,7 @@ if [[ "$SIGN_IDENTITY" == "-" ]]; then
   print "  Signature   : locale ad hoc (non notarisée)"
 else
   print "  Signature   : $SIGN_IDENTITY"
+fi
+if [[ -n "$NOTARY_PROFILE" ]]; then
+  print "  Notarisation : Apple (profil $NOTARY_PROFILE)"
 fi

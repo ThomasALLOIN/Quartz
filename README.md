@@ -24,11 +24,11 @@ Quartz est désormais livré comme une **application macOS locale**, tout en con
 - composeur relié à un unique petit modèle local MLX spécialisé en français, inclus dans les ressources de Quartz et démarré automatiquement en arrière-plan au premier envoi, sans Terminal ni fournisseur distant ; chaque proposition ouvre l’éditeur pour confirmation avant création.
 - interrupteur « IA locale » mémorisé dans le composeur et les réglages : le couper annule l’analyse en cours, empêche tout nouvel envoi et arrête le moteur démarré par Quartz.
 
-Le design et les fonctions ont été validés le 26 août 2026. Le bundle `1.0.0` possède l’icône aux trois obélisques, l’identifiant `com.thomasalloin.Quartz`, les textures, le modèle français et la commande externe.
+Le design et les fonctions ont été validés le 26 août 2026. Le bundle `1.0.1` possède l’icône aux trois obélisques, l’identifiant `com.thomasalloin.Quartz`, les textures, le modèle français et la commande externe. Sa distribution directe est signée Developer ID et notarisée par Apple.
 
 ## Utiliser Quartz.app
 
-L'installateur recommandé est `dist/Quartz-macOS-1.0.0.dmg`. Le ZIP et le bundle restent aussi disponibles dans `dist`.
+L'installateur recommandé est `dist/Quartz-macOS-1.0.1.dmg`. Le ZIP et le bundle restent aussi disponibles dans `dist`.
 
 1. Ouvrir le fichier `.dmg` dans Finder.
 2. Glisser **Quartz** vers le dossier **Applications** affiché dans la fenêtre.
@@ -42,7 +42,7 @@ Pour reconstruire l’application après une modification :
 ./Packager.command
 ```
 
-La commande vérifie le projet, compile en mode release, assemble les ressources, signe localement le bundle puis crée l’installateur DMG et l’archive ZIP. Cette première signature est ad hoc : l’application fonctionne sur ce Mac, mais une diffusion à d’autres utilisateurs exigera un certificat Developer ID et une notarisation Apple. Les détails sont dans [Distribution/README.md](Distribution/README.md).
+La commande vérifie le projet, compile en mode release, assemble les ressources, signe le bundle puis crée l’installateur DMG et l’archive ZIP. Pour une distribution publique, elle utilise l’identité Developer ID et un profil de notarisation déjà conservé dans le trousseau macOS ; aucun secret Apple ne doit être ajouté au dépôt. Les détails sont dans [Distribution/README.md](Distribution/README.md).
 
 ## Récupérer le projet
 
